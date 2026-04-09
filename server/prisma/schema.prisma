@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  schemas  = ["evidenceos"]
 }
 
 model User {
@@ -26,7 +25,6 @@ model User {
   sessions        Session[]
 
   @@map("users")
-  @@schema("evidenceos")
 }
 
 model VestigeCategory {
@@ -41,7 +39,6 @@ model VestigeCategory {
   vestiges      Vestige[]
 
   @@map("vestige_categories")
-  @@schema("evidenceos")
 }
 
 model Vestige {
@@ -74,7 +71,6 @@ model Vestige {
   updater       User?           @relation("UpdatedBy", fields: [updatedBy], references: [id])
 
   @@map("vestiges")
-  @@schema("evidenceos")
 }
 
 model CustodyStandard {
@@ -92,7 +88,6 @@ model CustodyStandard {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("custody_standards")
-  @@schema("evidenceos")
 }
 
 model AuditLog {
@@ -113,7 +108,6 @@ model AuditLog {
   user          User?     @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
-  @@schema("evidenceos")
 }
 
 model Session {
@@ -130,5 +124,4 @@ model Session {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
-  @@schema("evidenceos")
 }
