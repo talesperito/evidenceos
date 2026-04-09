@@ -9,7 +9,7 @@ import { CalendarIcon } from './icons/CalendarIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { PlusIcon } from './icons/PlusIcon';
 import { useVestiges } from '../hooks/useVestiges';
-import { User, SearchFilters, Vestige } from '../types';
+import { User, SearchFilters, Vestige, canCreateVestige, canDeleteVestige, canEditVestige } from '../types';
 import { logAction } from '../services/auditService';
 import { createVestige, deleteVestige, updateVestige } from '../services/dataService';
 
@@ -104,19 +104,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   };
 
   const handleCreateNew = () => {
-    if (!user.isAdmin) return;
+    if (!canCreateVestige(user)) return;
     setEditingVestige(null);
     setShowFormModal(true);
   };
 
   const handleEdit = (vestige: Vestige) => {
-    if (!user.isAdmin) return;
+    if (!canEditVestige(user)) return;
     setEditingVestige(vestige);
     setShowFormModal(true);
   };
 
   const handleDelete = async (vestige: Vestige) => {
-    if (!user.isAdmin) return;
+    if (!canDeleteVestige(user)) return;
     if (!confirm(`ATENÇÃO: Deseja realmente excluir permanentemente o item FAV ${vestige.fav}?\n\nEsta ação não poderá ser desfeita.`)) {
       return;
     }
@@ -179,14 +179,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
 
             <button
               onClick={handleCreateNew}
-              disabled={!user.isAdmin}
+              disabled={!canCreateVestige(user)}
               className={`order-1 sm:order-2 w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg font-bold text-sm transition-all shadow-lg ${
-                user.isAdmin
+                canCreateVestige(user)
                   ? 'bg-zinc-800 hover:bg-zinc-700 text-white border border-white/10 hover:border-amber-500/50'
                   : 'bg-zinc-900/50 text-zinc-600 cursor-not-allowed border border-zinc-800'
               }`}
             >
-              <PlusIcon className={`w-5 h-5 ${user.isAdmin ? 'text-amber-500' : ''}`} />
+              <PlusIcon className={`w-5 h-5 ${canCreateVestige(user) ? 'text-amber-500' : ''}`} />
               Novo Vestígio
             </button>
           </div>

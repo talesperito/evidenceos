@@ -65,7 +65,7 @@ export const saveUser = async (user: {
   name: string;
   email: string;
   password: string;
-  isAdmin: boolean;
+  role: UserRole;
 }): Promise<void> => {
   await apiRequest('/api/admin/users', {
     method: 'POST',
@@ -73,7 +73,7 @@ export const saveUser = async (user: {
       name: user.name,
       email: user.email,
       password: user.password,
-      role: user.isAdmin ? 'ADMIN' : 'PERITO',
+      role: user.role,
     }),
   });
 };
@@ -84,17 +84,13 @@ export const updateUser = async (
     name?: string;
     email?: string;
     password?: string;
-    isAdmin?: boolean;
+    role?: UserRole;
     active?: boolean;
   },
 ): Promise<AuthorizedUser> => {
   const response = await apiRequest<ApiUser>(`/api/admin/users/${userId}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      ...user,
-      role: user.isAdmin === undefined ? undefined : user.isAdmin ? 'ADMIN' : 'PERITO',
-      isAdmin: undefined,
-    }),
+    body: JSON.stringify(user),
   });
 
   return mapUser(response);

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Vestige, User } from '../types';
+import { Vestige, User, canDeleteVestige, canEditVestige } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -51,7 +51,8 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
 }) => {
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const custodyTime = useMemo(() => calculateCustodyTime(vestige.data), [vestige.data]);
-    const canEdit = user?.isAdmin; // Apenas ADMIN edita/exclui
+    const canEdit = user ? canEditVestige(user) : false;
+    const canDelete = user ? canDeleteVestige(user) : false;
     
   return (
     <div className={`group rounded-xl p-5 transition-all duration-300 relative border ${
@@ -88,13 +89,15 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
                      >
                         <PencilIcon className="w-4 h-4" />
                      </button>
-                     <button 
-                        onClick={() => onDelete && onDelete(vestige)}
-                        className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                        title="Excluir"
-                     >
-                        <TrashIcon className="w-4 h-4" />
-                     </button>
+                     {canDelete && (
+                         <button 
+                            onClick={() => onDelete && onDelete(vestige)}
+                            className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                            title="Excluir"
+                         >
+                            <TrashIcon className="w-4 h-4" />
+                         </button>
+                     )}
                  </div>
              )}
         </div>

@@ -789,3 +789,34 @@ LOG_LEVEL=info              # debug em dev, info em prod
 | **Backup**             | Nenhum                        | Diário automático + semanal manual       |
 | **Segurança**          | Inexistente                   | CORS, Helmet, Rate Limit, JWT, Argon2    |
 | **Tempo estimado**     | —                             | **10-15 dias úteis**                     |
+---
+
+## 14. Adendo Operacional â€” ProduÃ§Ã£o e Virada Definitiva
+
+**Atualizado em 2026-04-09**
+
+**SituaÃ§Ã£o atual da produÃ§Ã£o**:
+- Deploy concluÃ­do no EasyPanel com serviÃ§os separados `db`, `api` e `web`
+- PostgreSQL dedicado do EvidenceOS criado na VPS correta, sem qualquer compartilhamento com o Metascope
+- API publicada via GitHub + Nixpacks, com migrations aplicadas e health check funcional
+- Front-end publicado via GitHub + Nixpacks, autenticando contra a API de produÃ§Ã£o
+- Snapshot das planilhas exportado e importado com sucesso no PostgreSQL de produÃ§Ã£o
+- Primeiro usuÃ¡rio administrador criado e autenticado com sucesso
+
+**Leitura correta da Fase 5**:
+- Considerar a Fase 5 concluÃ­da do ponto de vista de infraestrutura e deploy
+- O item "Dockerfile multi-stage" deixou de ser obrigatÃ³rio neste ciclo, porque o deploy final foi estabilizado com GitHub + Nixpacks
+
+**Janela de convivÃªncia com Google Sheets**:
+- Durante a transiÃ§Ã£o, as planilhas ainda podem continuar sendo atualizadas e devem ser tratadas como fonte operacional temporÃ¡ria
+- O PostgreSQL atual representa um snapshot do momento em que `export-sheets.cjs` e `seed-from-snapshot.cjs` foram executados
+- MudanÃ§as feitas nas planilhas apÃ³s esse snapshot nÃ£o entram automaticamente no banco
+- Antes da virada definitiva para o EvidenceOS, deve ser executada uma importaÃ§Ã£o final de corte a partir da planilha
+- Essa importaÃ§Ã£o final deve ocorrer imediatamente antes do go-live oficial, para minimizar divergÃªncia entre planilha e banco
+- ApÃ³s a importaÃ§Ã£o final validada, a planilha deve entrar em modo somente leitura e o sistema novo passa a ser a fonte oficial
+
+**PendÃªncias recomendadas antes da virada final**:
+- Configurar backup automÃ¡tico do PostgreSQL e testar restore
+- Executar smoke test funcional com usuÃ¡rios reais
+- Trocar a senha inicial do administrador criado durante o deploy
+- Definir a data de corte para a importaÃ§Ã£o final da planilha

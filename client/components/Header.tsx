@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, getRoleLabel } from '../types';
 import { BookOpenIcon } from './icons/BookOpenIcon';
 import HelpModal from './HelpModal';
 
@@ -20,7 +20,8 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
   const [showHelp, setShowHelp] = useState(false);
-  const roleLabel = user.isAdmin ? 'Administrador' : user.role === 'VISUALIZADOR' ? 'Visualizador' : 'Perito';
+  const roleLabel = getRoleLabel(user.role);
+  const roleDotClass = user.role === 'ADMIN' ? 'bg-amber-500' : user.role === 'PERITO' ? 'bg-cyan-400' : 'bg-zinc-500';
 
   return (
     // Header Flutuante estilo "Dock"
@@ -58,7 +59,7 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-white">{user.name}</p>
                 <div className="flex items-center justify-end gap-1.5">
-                    <span className={`w-1.5 h-1.5 rounded-full ${user.isAdmin ? 'bg-amber-500' : 'bg-zinc-500'}`}></span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${roleDotClass}`}></span>
                     <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider">{roleLabel}</p>
                 </div>
               </div>

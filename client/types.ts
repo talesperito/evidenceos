@@ -13,6 +13,35 @@ export interface User {
 
 export interface AuthorizedUser extends User {}
 
+export const getRoleLabel = (role: UserRole): string => {
+  switch (role) {
+    case 'ADMIN':
+      return 'Administrador';
+    case 'PERITO':
+      return 'Operador';
+    case 'VISUALIZADOR':
+      return 'Visualizador';
+  }
+};
+
+export const canCreateVestige = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN' || user.role === 'PERITO';
+
+export const canEditVestige = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN' || user.role === 'PERITO';
+
+export const canDeleteVestige = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN';
+
+export const canManageUsers = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN';
+
+export const canManageStandards = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN';
+
+export const canViewAuditLogs = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN';
+
 export interface Vestige {
   id: string;
   material: string;

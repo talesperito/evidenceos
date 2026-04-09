@@ -24,21 +24,26 @@ export async function vestigeRoutes(server: FastifyInstance) {
     }
     return where;
   };
-  
-  // Middleware de proteção global para estas rotas
+
   server.addHook('onRequest', async (request) => {
     await request.jwtVerify();
   });
 
-  const requireWriteAccess = async (request: any, reply: any) => {
+  const requireEditorAccess = async (request: any, reply: any) => {
+    const user = request.user as { role?: string };
+    if (user.role !== 'ADMIN' && user.role !== 'PERITO') {
+      return reply.status(403).send({ message: 'Acesso negado: Requer perfil com permissão de edição' });
+    }
+  };
+
+  const requireAdminAccess = async (request: any, reply: any) => {
     const user = request.user as { role?: string };
     if (user.role !== 'ADMIN') {
       return reply.status(403).send({ message: 'Acesso negado: Requer privilégios de Admin' });
     }
   };
 
-  // Listar vestígios (Paginado + Filtros)
-  server.get('/', async (request, reply) => {
+  server.get('/', async (request) => {
     const { page, limit, category, search } = querySchema.parse(request.query);
     const skip = (page - 1) * limit;
     const where = buildWhereClause(category, search);
@@ -49,9 +54,9 @@ export async function vestigeRoutes(server: FastifyInstance) {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { category: true }
+        include: { category: true },
       }),
-      prisma.vestige.count({ where })
+      prisma.vestige.count({ where }),
     ]);
 
     return {
@@ -60,8 +65,8 @@ export async function vestigeRoutes(server: FastifyInstance) {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     };
   });
 
@@ -92,19 +97,18 @@ export async function vestigeRoutes(server: FastifyInstance) {
     };
   });
 
-  // Estatísticas
   server.get('/stats', async () => {
     const total = await prisma.vestige.count({ where: { deletedAt: null } });
     const statsByCategory = await prisma.vestige.groupBy({
       by: ['categoryId'],
       _count: { id: true },
-      where: { deletedAt: null }
+      where: { deletedAt: null },
     });
 
     return {
       total,
       statsByCategory,
-      timestamp: new Date()
+      timestamp: new Date(),
     };
   });
 
@@ -138,8 +142,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
     return vestige;
   });
 
-  // Criar vestígio
-  server.post('/', { preHandler: requireWriteAccess }, async (request, reply) => {
+  server.post('/', { preHandler: requireEditorAccess }, async (request) => {
     const vestigeSchema = z.object({
       material: z.string().min(1),
       categoryId: z.number(),
@@ -157,8 +160,8 @@ export async function vestigeRoutes(server: FastifyInstance) {
     const vestige = await prisma.vestige.create({
       data: {
         ...data,
-        createdBy: user.id
-      }
+        createdBy: user.id,
+      },
     });
 
     await auditService.log({
@@ -170,14 +173,13 @@ export async function vestigeRoutes(server: FastifyInstance) {
       targetId: vestige.id,
       details: data,
       ipAddress: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return vestige;
   });
 
-  // Atualizar vestígio
-  server.put('/:id', { preHandler: requireWriteAccess }, async (request, reply) => {
+  server.put('/:id', { preHandler: requireEditorAccess }, async (request) => {
     const { id } = request.params as { id: string };
     const user = request.user as any;
 
@@ -198,8 +200,8 @@ export async function vestigeRoutes(server: FastifyInstance) {
       where: { id },
       data: {
         ...data,
-        updatedBy: user.id
-      }
+        updatedBy: user.id,
+      },
     });
 
     await auditService.log({
@@ -211,20 +213,19 @@ export async function vestigeRoutes(server: FastifyInstance) {
       targetId: vestige.id,
       details: data,
       ipAddress: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return vestige;
   });
 
-  // Excluir (Soft Delete)
-  server.delete('/:id', { preHandler: requireWriteAccess }, async (request, reply) => {
+  server.delete('/:id', { preHandler: requireAdminAccess }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = request.user as any;
 
     await prisma.vestige.update({
       where: { id },
-      data: { deletedAt: new Date() }
+      data: { deletedAt: new Date() },
     });
 
     await auditService.log({
@@ -235,7 +236,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       targetType: 'vestige',
       targetId: id,
       ipAddress: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return reply.status(204).send();

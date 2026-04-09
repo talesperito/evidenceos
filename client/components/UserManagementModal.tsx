@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { deleteUser, getUsers, saveUser } from '../services/userService';
-import { AuthorizedUser } from '../types';
+import { AuthorizedUser, UserRole, getRoleLabel } from '../types';
 import { XIcon } from './icons/XIcon';
 import { TrashIcon } from './icons/TrashIcon';
 
@@ -10,7 +10,12 @@ interface UserManagementModalProps {
 
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) => {
   const [users, setUsers] = useState<AuthorizedUser[]>([]);
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', isAdmin: false });
+  const [newUser, setNewUser] = useState<{ name: string; email: string; password: string; role: UserRole }>({
+    name: '',
+    email: '',
+    password: '',
+    role: 'PERITO',
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +42,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
         throw new Error('A senha deve ter pelo menos 6 caracteres.');
       }
       await saveUser(newUser);
-      setNewUser({ name: '', email: '', password: '', isAdmin: false });
+      setNewUser({ name: '', email: '', password: '', role: 'PERITO' });
       await loadUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao cadastrar usuário.');
@@ -51,6 +56,17 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
       await loadUsers();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Falha ao remover usuário.');
+    }
+  };
+
+  const roleBadgeClass = (role: UserRole) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'bg-purple-500/20 text-purple-300';
+      case 'PERITO':
+        return 'bg-cyan-500/20 text-cyan-300';
+      case 'VISUALIZADOR':
+        return 'bg-zinc-700 text-zinc-300';
     }
   };
 
@@ -78,7 +94,9 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                     <div>
                       <p className="font-medium text-white">
                         {user.name}
-                        {user.isAdmin && <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded">ADMIN</span>}
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${roleBadgeClass(user.role)}`}>
+                          {getRoleLabel(user.role).toUpperCase()}
+                        </span>
                         {!user.active && <span className="ml-2 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">INATIVO</span>}
                       </p>
                       <p className="text-sm text-slate-400">{user.email}</p>
@@ -131,16 +149,17 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                     placeholder="Mínimo 6 caracteres"
                   />
                 </div>
-                <div className="flex items-center pt-5">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newUser.isAdmin}
-                      onChange={(e) => setNewUser({ ...newUser, isAdmin: e.target.checked })}
-                      className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-cyan-600 focus:ring-offset-slate-900"
-                    />
-                    <span className="text-sm text-slate-300">Acesso de Administrador</span>
-                  </label>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">Perfil de Acesso</label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
+                  >
+                    <option value="PERITO">Operador</option>
+                    <option value="VISUALIZADOR">Visualizador</option>
+                    <option value="ADMIN">Administrador</option>
+                  </select>
                 </div>
               </div>
 

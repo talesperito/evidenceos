@@ -7,7 +7,13 @@ import ReportModal from './ReportModal';
 import UserManagementModal from './UserManagementModal';
 import AuditLogModal from './AuditLogModal';
 import FAQManagementModal from './FAQManagementModal';
-import { ReportData, User } from '../types';
+import {
+  ReportData,
+  User,
+  canManageStandards,
+  canManageUsers,
+  canViewAuditLogs,
+} from '../types';
 import { logAction } from '../services/auditService';
 
 interface AdminPanelProps {
@@ -24,7 +30,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
 
-  const hasPermission = (action: string) => action === 'RELATORIO' || user.isAdmin;
+  const hasPermission = (action: string) => {
+    switch (action) {
+      case 'RELATORIO':
+        return true;
+      case 'GESTAO_USUARIOS':
+        return canManageUsers(user);
+      case 'GESTAO_FAQ':
+        return canManageStandards(user);
+      case 'AUDITORIA':
+        return canViewAuditLogs(user);
+      default:
+        return false;
+    }
+  };
 
   const handleAction = async (actionName: string, callback: () => void) => {
     if (!hasPermission(actionName)) {
@@ -47,16 +66,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
 
   return (
     <div className="mb-6 p-4 bg-slate-800 rounded-lg border border-slate-700 relative overflow-hidden">
-      {!user.isAdmin && (
+      {!canManageUsers(user) && (
         <div className="absolute top-0 right-0 p-2">
-          <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-slate-900/50 px-2 py-1 rounded border border-slate-700" title="Acesso limitado a Relatórios">
-            Perfil Padrão
+          <span
+            className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-slate-900/50 px-2 py-1 rounded border border-slate-700"
+            title="Acesso administrativo não disponível para este perfil"
+          >
+            Acesso Limitado
           </span>
         </div>
       )}
 
       <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${user.isAdmin ? 'bg-cyan-400' : 'bg-slate-500'}`} />
+        <span className={`w-2 h-2 rounded-full ${canManageUsers(user) ? 'bg-cyan-400' : 'bg-slate-500'}`} />
         Painel de Gestão
       </h3>
 
@@ -74,7 +96,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
           onClick={() => void handleAction('GESTAO_USUARIOS', () => setShowUserModal(true))}
           className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 text-white font-semibold rounded-md hover:bg-slate-600 border border-slate-600 transition-colors w-full', 'GESTAO_USUARIOS')}
         >
-          <UsersIcon className={`w-5 h-5 ${user.isAdmin ? 'text-cyan-400' : 'text-slate-400'}`} />
+          <UsersIcon className={`w-5 h-5 ${canManageUsers(user) ? 'text-cyan-400' : 'text-slate-400'}`} />
           Gerenciar Usuários
         </button>
 
@@ -82,7 +104,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
           onClick={() => void handleAction('GESTAO_FAQ', () => setShowFAQModal(true))}
           className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 text-white font-semibold rounded-md hover:bg-slate-600 border border-slate-600 transition-colors w-full', 'GESTAO_FAQ')}
         >
-          <QuestionMarkCircleIcon className={`w-5 h-5 ${user.isAdmin ? 'text-cyan-400' : 'text-slate-400'}`} />
+          <QuestionMarkCircleIcon className={`w-5 h-5 ${canManageStandards(user) ? 'text-cyan-400' : 'text-slate-400'}`} />
           Gerir Normas
         </button>
 
