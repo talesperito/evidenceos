@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["evidenceos"]
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          String    @default("PERITO") // ADMIN, PERITO, VISUALIZADOR
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  lastLoginAt   DateTime? @map("last_login_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Relations
+  createdVestiges Vestige[]  @relation("CreatedBy")
+  updatedVestiges Vestige[]  @relation("UpdatedBy")
+  auditLogs       AuditLog[]
+  sessions        Session[]
+
+  @@map("users")
+  @@schema("evidenceos")
+}
+
+model VestigeCategory {
+  id            Int       @id @default(autoincrement())
+  name          String    @unique
+  originalSheet String?   @map("original_sheet")
+  description   String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  vestiges      Vestige[]
+
+  @@map("vestige_categories")
+  @@schema("evidenceos")
+}
+
+model Vestige {
+  id            String    @id @default(uuid())
+  legacyId      String?   @map("legacy_id")
+  categoryId    Int       @map("category_id")
+  registroFav   String?   @map("registro_fav")
+  requisicao    String?   @map("requisicao")
+  involucro     String?   @map("involucro")
+  material      String
+  tipoMaterial  String?   @map("tipo_material")
+  municipio     String    @default("Lavras")
+  dataColeta    DateTime? @map("data_coleta")
+  observacoes   String?
+  
+  // Metadados
+  createdBy     String?   @map("created_by")
+  updatedBy     String?   @map("updated_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  // Controle de importação
+  importedFrom  String    @default("google_sheets") @map("imported_from")
+  importedAt    DateTime? @map("imported_at")
+
+  // Relations
+  category      VestigeCategory @relation(fields: [categoryId], references: [id])
+  creator       User?           @relation("CreatedBy", fields: [createdBy], references: [id])
+  updater       User?           @relation("UpdatedBy", fields: [updatedBy], references: [id])
+
+  @@map("vestiges")
+  @@schema("evidenceos")
+}
+
+model CustodyStandard {
+  id            Int       @id @default(autoincrement())
+  code          String    @unique
+  title         String
+  category      String?   // legislação, norma_tecnica, procedimento_interno
+  description   String?
+  fullText      String?   @map("full_text")
+  sourceUrl     String?   @map("source_url")
+  effectiveDate DateTime? @map("effective_date")
+  version       String?
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("custody_standards")
+  @@schema("evidenceos")
+}
+
+model AuditLog {
+  id            BigInt    @id @default(autoincrement())
+  userId        String?   @map("user_id")
+  userEmail     String    @map("user_email")
+  userName      String    @map("user_name")
+  action        String    // LOGIN, LOGOUT, SEARCH, etc.
+  targetType    String?   @map("target_type")
+  targetId      String?   @map("target_id")
+  details       Json      @default("{}")
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
+  sessionId     String?   @map("session_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user          User?     @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+  @@schema("evidenceos")
+}
+
+model Session {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  tokenHash     String    @map("token_hash")
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
+  expiresAt     DateTime  @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  revokedAt     DateTime? @map("revoked_at")
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+  @@schema("evidenceos")
+}

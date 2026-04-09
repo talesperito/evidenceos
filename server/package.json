@@ -1,0 +1,42 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "phase2:export": "node scripts/export-sheets.cjs",
+    "phase2:seed": "node scripts/seed-from-snapshot.cjs",
+    "phase2:validate": "node scripts/validate-import.cjs",
+    "phase2:run": "node scripts/phase2-run.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/static": "^9.1.0",
+    "@prisma/adapter-pg": "^7.7.0",
+    "@prisma/client": "^7.7.0",
+    "argon2": "^0.44.0",
+    "dotenv": "^17.4.1",
+    "fastify": "^5.8.4",
+    "pg": "^8.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/pg": "^8.20.0",
+    "nodemon": "^3.1.14",
+    "prisma": "^7.7.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  }
+}

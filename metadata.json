@@ -1,0 +1,5 @@
+{
+  "name": "EvidenceOS – URC Lavras/MG - Após inserção e edição de dados - 18/01",
+  "description": "A web application to manage and search for forensic vestiges, integrated with Google Sheets data. It provides search functionality, custody time tracking, and automated reporting.",
+  "requestFramePermissions": []
+}
