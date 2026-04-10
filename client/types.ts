@@ -18,7 +18,7 @@ export const getRoleLabel = (role: UserRole): string => {
     case 'ADMIN':
       return 'Administrador';
     case 'PERITO':
-      return 'Operador';
+      return 'Perito';
     case 'VISUALIZADOR':
       return 'Visualizador';
   }
@@ -37,7 +37,7 @@ export const canManageUsers = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN';
 
 export const canManageStandards = (user: Pick<User, 'role'>): boolean =>
-  user.role === 'ADMIN';
+  user.role === 'ADMIN' || user.role === 'PERITO';
 
 export const canViewAuditLogs = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN';

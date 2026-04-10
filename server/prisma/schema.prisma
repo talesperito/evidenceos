@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  schemas  = ["public"]
 }
 
 model User {
@@ -25,6 +26,7 @@ model User {
   sessions        Session[]
 
   @@map("users")
+  @@schema("public")
 }
 
 model VestigeCategory {
@@ -39,6 +41,7 @@ model VestigeCategory {
   vestiges      Vestige[]
 
   @@map("vestige_categories")
+  @@schema("public")
 }
 
 model Vestige {
@@ -71,6 +74,7 @@ model Vestige {
   updater       User?           @relation("UpdatedBy", fields: [updatedBy], references: [id])
 
   @@map("vestiges")
+  @@schema("public")
 }
 
 model CustodyStandard {
@@ -88,6 +92,7 @@ model CustodyStandard {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("custody_standards")
+  @@schema("public")
 }
 
 model AuditLog {
@@ -108,6 +113,7 @@ model AuditLog {
   user          User?     @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
+  @@schema("public")
 }
 
 model Session {
@@ -124,4 +130,5 @@ model Session {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+  @@schema("public")
 }

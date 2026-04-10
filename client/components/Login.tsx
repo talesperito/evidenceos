@@ -6,9 +6,26 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
+const EyeIcon: React.FC<{ open: boolean }> = ({ open }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    {open ? (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ) : (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.94 17.94A10.94 10.94 0 0112 20C7 20 2.73 16.89 1 12c.92-2.6 2.63-4.84 4.88-6.32M9.9 4.24A10.99 10.99 0 0112 4c5 0 9.27 3.11 11 8a11.05 11.05 0 01-4.17 5.94M1 1l22 22" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 9.53A3 3 0 0012 15a3 3 0 002.47-.53" />
+      </>
+    )}
+  </svg>
+);
+
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -54,8 +71,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             Evidence<span className="text-amber-500">OS</span>
           </h1>
           <p className="text-lg text-zinc-400 font-light max-w-md leading-relaxed">
-            Gestão integrada de cadeia de custódia e controle forense.
-            <br /><span className="text-zinc-500 text-sm">Versão 2.0</span>
+            Gestao integrada de cadeia de custodia e controle forense.
+            <br /><span className="text-zinc-500 text-sm">Versao 2.0</span>
           </p>
         </div>
 
@@ -82,11 +99,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="w-full max-w-sm mx-auto relative z-20">
           <div className="lg:hidden mb-12">
             <h1 className="text-3xl font-black tracking-tight text-white mb-2">Evidence<span className="text-amber-500">OS</span></h1>
-            <p className="text-sm text-zinc-500">Acesso Restrito - Polícia Civil MG</p>
+            <p className="text-sm text-zinc-500">Acesso Restrito - Policia Civil MG</p>
           </div>
 
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Identificação</h2>
+            <h2 className="text-2xl font-bold text-white mb-2">Identificacao</h2>
             <p className="text-zinc-500 text-sm">Insira suas credenciais funcionais para prosseguir.</p>
           </div>
 
@@ -111,21 +128,29 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <label className="block text-[10px] uppercase tracking-wider font-bold text-zinc-500 mb-2 group-focus-within:text-amber-500 transition-colors">Chave de Acesso</label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={loading}
-                  className="w-full bg-zinc-900/50 border-b-2 border-zinc-800 text-white px-0 py-3 placeholder-zinc-700 focus:outline-none focus:border-amber-500 transition-all font-mono text-sm"
+                  className="w-full bg-zinc-900/50 border-b-2 border-zinc-800 text-white px-0 py-3 pr-10 placeholder-zinc-700 focus:outline-none focus:border-amber-500 transition-all font-mono text-sm"
                   placeholder="••••••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-zinc-500 hover:text-amber-400 transition-colors"
+                  title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                >
+                  <EyeIcon open={showPassword} />
+                </button>
                 <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-amber-500 transition-all group-focus-within:w-full" />
               </div>
             </div>
 
             {error && (
               <div className="p-4 bg-red-500/5 border-l-2 border-red-500 text-red-400 text-xs animate-in slide-in-from-left-2">
-                <p className="font-bold mb-1">Erro de Autenticação</p>
+                <p className="font-bold mb-1">Erro de Autenticacao</p>
                 {error}
               </div>
             )}

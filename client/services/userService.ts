@@ -56,6 +56,13 @@ export const logout = async (): Promise<void> => {
   }
 };
 
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  await apiRequest('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+};
+
 export const getUsers = async (): Promise<AuthorizedUser[]> => {
   const users = await apiRequest<ApiUser[]>('/api/admin/users');
   return users.map(mapUser);

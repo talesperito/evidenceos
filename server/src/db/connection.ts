@@ -1,7 +1,10 @@
-import 'dotenv/config';
+import path from 'node:path';
+import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -17,7 +20,7 @@ const pool = new Pool({
   options: `-c search_path=${schema}`,
 });
 
-const adapter = new PrismaPg(pool);
+const adapter = new PrismaPg(pool, { schema });
 const prisma = new PrismaClient({ adapter });
 
 export { pool, prisma, schema };

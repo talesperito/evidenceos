@@ -19,8 +19,6 @@ const REFRESH_COOKIE_OPTIONS = {
 };
 
 export async function authRoutes(server: FastifyInstance) {
-  
-  // Login
   server.post('/login', async (request, reply) => {
     const loginSchema = z.object({
       email: z.string().email(),
@@ -29,16 +27,14 @@ export async function authRoutes(server: FastifyInstance) {
 
     const { email, password } = loginSchema.parse(request.body);
 
-    // Buscar usuário
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email },
     });
 
     if (!user || !user.active) {
-      return reply.status(401).send({ message: 'Credenciais inválidas' });
+      return reply.status(401).send({ message: 'Credenciais invalidas' });
     }
 
-    // Verificar senha
     const isPasswordValid = await argon2.verify(user.passwordHash, password);
     if (!isPasswordValid) {
       await auditService.log({
@@ -47,9 +43,9 @@ export async function authRoutes(server: FastifyInstance) {
         action: 'LOGIN_FAILED',
         details: { reason: 'Senha incorreta' },
         ipAddress: request.ip,
-        userAgent: request.headers['user-agent']
+        userAgent: request.headers['user-agent'],
       });
-      return reply.status(401).send({ message: 'Credenciais inválidas' });
+      return reply.status(401).send({ message: 'Credenciais invalidas' });
     }
 
     const tokenUser = {
@@ -86,19 +82,73 @@ export async function authRoutes(server: FastifyInstance) {
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
-    
-    return { 
-      token, 
-      user: { 
+
+    return {
+      token,
+      user: {
         id: user.id,
-        email: user.email, 
-        name: user.name, 
-        role: user.role 
-      } 
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     };
   });
 
-  // Logout (Revogação de token seria feita com tokens opacos/Redis, aqui apenas limpamos no front)
+  server.post('/change-password', {
+    onRequest: [async (request) => await request.jwtVerify()],
+  }, async (request, reply) => {
+    const user = request.user as { id: string; email: string; name: string };
+    const changePasswordSchema = z.object({
+      currentPassword: z.string().min(1),
+      newPassword: z.string().min(6),
+    });
+
+    const { currentPassword, newPassword } = changePasswordSchema.parse(request.body);
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: user.id },
+    });
+
+    if (!currentUser || !currentUser.active) {
+      return reply.status(404).send({ message: 'Usuario nao encontrado' });
+    }
+
+    const isCurrentPasswordValid = await argon2.verify(currentUser.passwordHash, currentPassword);
+    if (!isCurrentPasswordValid) {
+      await auditService.log({
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'PASSWORD_CHANGE_FAILED',
+        details: { reason: 'Senha atual incorreta' },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return reply.status(401).send({ message: 'Senha atual incorreta' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await argon2.hash(newPassword),
+      },
+    });
+
+    await auditService.log({
+      userId: user.id,
+      userEmail: user.email,
+      userName: user.name,
+      action: 'PASSWORD_CHANGE',
+      targetType: 'user',
+      targetId: user.id,
+      ipAddress: request.ip,
+      userAgent: request.headers['user-agent'],
+    });
+
+    return { message: 'Senha atualizada com sucesso' };
+  });
+
   server.post('/logout', {
     onRequest: [async (request) => await request.jwtVerify()],
   }, async (request, reply) => {
@@ -107,14 +157,14 @@ export async function authRoutes(server: FastifyInstance) {
 
     await revokeSessionByToken(refreshToken);
     reply.clearCookie(REFRESH_COOKIE_NAME, REFRESH_COOKIE_OPTIONS);
-    
+
     await auditService.log({
       userId: user.id,
       userEmail: user.email,
       userName: user.name,
       action: 'LOGOUT',
       ipAddress: request.ip,
-      userAgent: request.headers['user-agent']
+      userAgent: request.headers['user-agent'],
     });
 
     return { status: 'logged out' };
@@ -126,7 +176,7 @@ export async function authRoutes(server: FastifyInstance) {
 
     if (!session) {
       reply.clearCookie(REFRESH_COOKIE_NAME, REFRESH_COOKIE_OPTIONS);
-      return reply.status(401).send({ message: 'Sessão expirada ou inválida' });
+      return reply.status(401).send({ message: 'Sessao expirada ou invalida' });
     }
 
     await revokeSessionByToken(refreshToken);
@@ -170,7 +220,6 @@ export async function authRoutes(server: FastifyInstance) {
     };
   });
 
-  // Dados do usuário logado
   server.get('/me', {
     onRequest: [async (request) => await request.jwtVerify()],
   }, async (request) => {

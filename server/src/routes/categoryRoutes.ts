@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../db/connection';
+import { ensureVestigeCategories } from '../services/vestigeCategoryService';
 
 export async function categoryRoutes(server: FastifyInstance) {
   
@@ -9,6 +10,8 @@ export async function categoryRoutes(server: FastifyInstance) {
 
   // Listar categorias
   server.get('/', async () => {
+    await ensureVestigeCategories();
+
     return await prisma.vestigeCategory.findMany({
       where: { active: true },
       orderBy: { name: 'asc' }

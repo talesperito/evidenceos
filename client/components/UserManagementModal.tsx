@@ -8,6 +8,22 @@ interface UserManagementModalProps {
   onClose: () => void;
 }
 
+const EyeIcon: React.FC<{ open: boolean }> = ({ open }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    {open ? (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+        <circle cx="12" cy="12" r="3" />
+      </>
+    ) : (
+      <>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17.94 17.94A10.94 10.94 0 0112 20C7 20 2.73 16.89 1 12c.92-2.6 2.63-4.84 4.88-6.32M9.9 4.24A10.99 10.99 0 0112 4c5 0 9.27 3.11 11 8a11.05 11.05 0 01-4.17 5.94M1 1l22 22" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.53 9.53A3 3 0 0012 15a3 3 0 002.47-.53" />
+      </>
+    )}
+  </svg>
+);
+
 const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) => {
   const [users, setUsers] = useState<AuthorizedUser[]>([]);
   const [newUser, setNewUser] = useState<{ name: string; email: string; password: string; role: UserRole }>({
@@ -17,6 +33,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     role: 'PERITO',
   });
   const [error, setError] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadUsers = async () => {
@@ -24,7 +42,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
     try {
       setUsers(await getUsers());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao carregar usuários.');
+      setError(err instanceof Error ? err.message : 'Falha ao carregar usuarios.');
     } finally {
       setLoading(false);
     }
@@ -37,25 +55,30 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setCreatedCredentials(null);
     try {
       if (newUser.password.length < 6) {
         throw new Error('A senha deve ter pelo menos 6 caracteres.');
       }
+
+      const createdEmail = newUser.email;
+      const createdPassword = newUser.password;
       await saveUser(newUser);
       setNewUser({ name: '', email: '', password: '', role: 'PERITO' });
+      setCreatedCredentials({ email: createdEmail, password: createdPassword });
       await loadUsers();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Falha ao cadastrar usuário.');
+      setError(err instanceof Error ? err.message : 'Falha ao cadastrar usuario.');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja remover este usuário?')) return;
+    if (!confirm('Tem certeza que deseja remover este usuario?')) return;
     try {
       await deleteUser(id);
       await loadUsers();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Falha ao remover usuário.');
+      alert(err instanceof Error ? err.message : 'Falha ao remover usuario.');
     }
   };
 
@@ -75,7 +98,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
       <div className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-700 flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-5 border-b border-slate-700 bg-slate-800/50 rounded-t-xl">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            Gerenciar Usuários
+            Gerenciar Usuarios
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors">
             <XIcon className="w-5 h-5" />
@@ -84,9 +107,9 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
 
         <div className="p-6 overflow-y-auto custom-scrollbar flex-grow">
           <div className="mb-8">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Usuários Cadastrados</h3>
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Usuarios Cadastrados</h3>
             {loading ? (
-              <div className="text-sm text-slate-500">Carregando usuários...</div>
+              <div className="text-sm text-slate-500">Carregando usuarios...</div>
             ) : (
               <div className="space-y-2">
                 {users.map((user) => (
@@ -104,7 +127,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                     <button
                       onClick={() => void handleDelete(user.id)}
                       className="p-2 text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-                      title="Remover usuário"
+                      title="Remover usuario"
                     >
                       <TrashIcon className="w-4 h-4" />
                     </button>
@@ -139,15 +162,25 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Senha Provisória</label>
-                  <input
-                    type="text"
-                    required
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
-                    placeholder="Mínimo 6 caracteres"
-                  />
+                  <label className="block text-xs text-slate-400 mb-1">Senha Provisoria</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                      className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 pr-10 text-white text-sm focus:border-cyan-500 outline-none"
+                      placeholder="Minimo 6 caracteres"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((current) => !current)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-cyan-400 transition-colors"
+                      title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      <EyeIcon open={showPassword} />
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Perfil de Acesso</label>
@@ -156,7 +189,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
                     className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
                   >
-                    <option value="PERITO">Operador</option>
+                    <option value="PERITO">Perito</option>
                     <option value="VISUALIZADOR">Visualizador</option>
                     <option value="ADMIN">Administrador</option>
                   </select>
@@ -164,12 +197,22 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
               </div>
 
               {error && <p className="text-red-400 text-xs">{error}</p>}
+              {createdCredentials && (
+                <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+                  <p className="font-semibold mb-1">Usuario cadastrado com sucesso.</p>
+                  <p>E-mail: {createdCredentials.email}</p>
+                  <p>Senha provisoria: {createdCredentials.password}</p>
+                  <p className="mt-2 text-emerald-300/80">
+                    Guarde essa senha agora. Depois do cadastro ela nao pode ser consultada no sistema, apenas redefinida.
+                  </p>
+                </div>
+              )}
 
               <button
                 type="submit"
                 className="w-full py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold rounded text-sm transition-colors"
               >
-                Cadastrar Usuário
+                Cadastrar Usuario
               </button>
             </form>
           </div>

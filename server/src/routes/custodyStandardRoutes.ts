@@ -15,6 +15,8 @@ const standardSchema = z.object({
   active: z.boolean().optional(),
 });
 
+const canManageStandards = (role?: string) => role === 'ADMIN' || role === 'PERITO';
+
 export async function custodyStandardRoutes(server: FastifyInstance) {
   server.addHook('onRequest', async (request) => {
     await request.jwtVerify();
@@ -29,8 +31,8 @@ export async function custodyStandardRoutes(server: FastifyInstance) {
 
   server.post('/', async (request, reply) => {
     const user = request.user as { id: string; email: string; name: string; role?: string };
-    if (user.role !== 'ADMIN') {
-      return reply.status(403).send({ message: 'Acesso negado: Requer privilégios de Admin' });
+    if (!canManageStandards(user.role)) {
+      return reply.status(403).send({ message: 'Acesso negado: Requer permissao para gerir normas' });
     }
 
     const data = standardSchema.parse(request.body);
@@ -58,8 +60,8 @@ export async function custodyStandardRoutes(server: FastifyInstance) {
 
   server.put('/:id', async (request, reply) => {
     const user = request.user as { id: string; email: string; name: string; role?: string };
-    if (user.role !== 'ADMIN') {
-      return reply.status(403).send({ message: 'Acesso negado: Requer privilégios de Admin' });
+    if (!canManageStandards(user.role)) {
+      return reply.status(403).send({ message: 'Acesso negado: Requer permissao para gerir normas' });
     }
 
     const { id } = request.params as { id: string };
@@ -89,8 +91,8 @@ export async function custodyStandardRoutes(server: FastifyInstance) {
 
   server.delete('/:id', async (request, reply) => {
     const user = request.user as { id: string; email: string; name: string; role?: string };
-    if (user.role !== 'ADMIN') {
-      return reply.status(403).send({ message: 'Acesso negado: Requer privilégios de Admin' });
+    if (!canManageStandards(user.role)) {
+      return reply.status(403).send({ message: 'Acesso negado: Requer permissao para gerir normas' });
     }
 
     const { id } = request.params as { id: string };

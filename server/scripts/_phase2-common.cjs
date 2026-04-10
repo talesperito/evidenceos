@@ -39,7 +39,7 @@ function createDbClients() {
     options: `-c search_path=${schema}`,
   });
   const prisma = new PrismaClient({
-    adapter: new PrismaPg(pool),
+    adapter: new PrismaPg(pool, { schema }),
   });
 
   return { pool, prisma, schema };
