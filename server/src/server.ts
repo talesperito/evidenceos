@@ -21,7 +21,9 @@ server.register(cors, {
 });
 
 server.register(jwt, {
-  secret: process.env.JWT_SECRET || 'secret-development-key',
+  secret: process.env.JWT_SECRET ?? (() => {
+    throw new Error('JWT_SECRET is not set');
+  })(),
 });
 
 server.register(cookie);
