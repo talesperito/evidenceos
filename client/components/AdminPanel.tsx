@@ -35,7 +35,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
       case 'RELATORIO':
         return true;
       case 'GESTAO_USUARIOS':
-        return canManageUsers(user);
+        return user.role === 'ADMIN' || user.role === 'PERITO';
       case 'GESTAO_FAQ':
         return canManageStandards(user);
       case 'AUDITORIA':
@@ -118,7 +118,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
       </div>
 
       {reportData && <ReportModal reportData={reportData} onClose={onCloseReport} />}
-      {showUserModal && <UserManagementModal onClose={() => setShowUserModal(false)} />}
+      {showUserModal && <UserManagementModal user={user} onClose={() => setShowUserModal(false)} />}
       {showAuditModal && <AuditLogModal onClose={() => setShowAuditModal(false)} />}
       {showFAQModal && <FAQManagementModal onClose={() => setShowFAQModal(false)} />}
     </div>

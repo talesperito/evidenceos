@@ -6,12 +6,12 @@ import { auditService } from '../services/auditService';
 
 export async function userRoutes(server: FastifyInstance) {
   
-  // Middleware de Admin
+  // Middleware de Admin e Perito
   server.addHook('onRequest', async (request, reply) => {
     await request.jwtVerify();
     const user = request.user as any;
-    if (user.role !== 'ADMIN') {
-      return reply.status(403).send({ message: 'Acesso negado: Requer privilégios de Admin' });
+    if (user.role !== 'ADMIN' && user.role !== 'PERITO') {
+      return reply.status(403).send({ message: 'Acesso negado: Requer privilégios administrativos' });
     }
   });
 
@@ -34,6 +34,10 @@ export async function userRoutes(server: FastifyInstance) {
 
     const data = userSchema.parse(request.body);
     const admin = request.user as any;
+
+    if (admin.role !== 'ADMIN' && data.role === 'ADMIN') {
+      return reply.status(403).send({ message: 'Acesso negado: Apenas Administradores podem criar perfil de ADMIN' });
+    }
 
     const passwordHash = await argon2.hash(data.password);
 
@@ -74,6 +78,11 @@ export async function userRoutes(server: FastifyInstance) {
     });
 
     const data = updateUserSchema.parse(request.body);
+    
+    if (admin.role !== 'ADMIN' && data.role === 'ADMIN') {
+      return reply.status(403).send({ message: 'Acesso negado: Apenas Administradores podem promover para ADMIN' });
+    }
+
     const updateData: Record<string, unknown> = {};
 
     if (data.name !== undefined) updateData.name = data.name;
@@ -125,6 +134,10 @@ export async function userRoutes(server: FastifyInstance) {
   server.delete('/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const admin = request.user as any;
+
+    if (admin.role !== 'ADMIN') {
+      return reply.status(403).send({ message: 'Acesso negado: Apenas Administradores podem remover usuários' });
+    }
 
     await prisma.user.update({
       where: { id },

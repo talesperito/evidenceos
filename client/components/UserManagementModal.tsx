@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { deleteUser, getUsers, saveUser } from '../services/userService';
-import { AuthorizedUser, UserRole, getRoleLabel } from '../types';
+import { AuthorizedUser, User, UserRole, getRoleLabel } from '../types';
 import { XIcon } from './icons/XIcon';
 import { TrashIcon } from './icons/TrashIcon';
 
 interface UserManagementModalProps {
+  user: User;
   onClose: () => void;
 }
 
@@ -24,7 +25,7 @@ const EyeIcon: React.FC<{ open: boolean }> = ({ open }) => (
   </svg>
 );
 
-const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) => {
+const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose }) => {
   const [users, setUsers] = useState<AuthorizedUser[]>([]);
   const [newUser, setNewUser] = useState<{ name: string; email: string; password: string; role: UserRole }>({
     name: '',
@@ -112,25 +113,27 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
               <div className="text-sm text-slate-500">Carregando usuarios...</div>
             ) : (
               <div className="space-y-2">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center justify-between p-3 bg-slate-800 rounded border border-slate-700">
+                {users.map((mappedUser) => (
+                  <div key={mappedUser.id} className="flex items-center justify-between p-3 bg-slate-800 rounded border border-slate-700">
                     <div>
                       <p className="font-medium text-white">
-                        {user.name}
-                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${roleBadgeClass(user.role)}`}>
-                          {getRoleLabel(user.role).toUpperCase()}
+                        {mappedUser.name}
+                        <span className={`ml-2 text-xs px-1.5 py-0.5 rounded ${roleBadgeClass(mappedUser.role)}`}>
+                          {getRoleLabel(mappedUser.role).toUpperCase()}
                         </span>
-                        {!user.active && <span className="ml-2 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">INATIVO</span>}
+                        {!mappedUser.active && <span className="ml-2 text-xs bg-zinc-700 text-zinc-300 px-1.5 py-0.5 rounded">INATIVO</span>}
                       </p>
-                      <p className="text-sm text-slate-400">{user.email}</p>
+                      <p className="text-sm text-slate-400">{mappedUser.email}</p>
                     </div>
-                    <button
-                      onClick={() => void handleDelete(user.id)}
-                      className="p-2 text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
-                      title="Remover usuario"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
+                    {user.role === 'ADMIN' && (
+                      <button
+                        onClick={() => void handleDelete(mappedUser.id)}
+                        className="p-2 text-red-400 hover:bg-red-500/10 rounded-md transition-colors"
+                        title="Remover usuario"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -191,7 +194,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ onClose }) =>
                   >
                     <option value="PERITO">Perito</option>
                     <option value="VISUALIZADOR">Visualizador</option>
-                    <option value="ADMIN">Administrador</option>
+                    {user.role === 'ADMIN' && <option value="ADMIN">Administrador</option>}
                   </select>
                 </div>
               </div>

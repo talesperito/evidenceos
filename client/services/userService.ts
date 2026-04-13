@@ -50,7 +50,7 @@ export const getCurrentUser = async (): Promise<User> => {
 
 export const logout = async (): Promise<void> => {
   try {
-    await apiRequest('/api/auth/logout', { method: 'POST' });
+    await apiRequest('/api/auth/logout', { method: 'POST', body: '{}' });
   } finally {
     setAccessToken(null);
   }

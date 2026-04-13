@@ -2,6 +2,7 @@ import fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
+
 import { prisma } from './db/connection';
 import { authRoutes } from './routes/authRoutes';
 import { vestigeRoutes } from './routes/vestigeRoutes';
@@ -53,6 +54,8 @@ server.get('/api/health', async (request, reply) => {
     });
   }
 });
+
+
 
 // Inicialização
 const start = async () => {

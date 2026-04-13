@@ -34,7 +34,7 @@ export const canDeleteVestige = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN';
 
 export const canManageUsers = (user: Pick<User, 'role'>): boolean =>
-  user.role === 'ADMIN';
+  user.role === 'ADMIN' || user.role === 'PERITO';
 
 export const canManageStandards = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN' || user.role === 'PERITO';

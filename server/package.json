@@ -12,6 +12,7 @@
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "bootstrap:admin": "node scripts/bootstrap-admin.cjs",
     "phase2:export": "node scripts/export-sheets.cjs",
     "phase2:seed": "node scripts/seed-from-snapshot.cjs",
     "phase2:validate": "node scripts/validate-import.cjs",
