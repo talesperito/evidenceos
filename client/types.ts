@@ -53,6 +53,12 @@ export interface Vestige {
   planilhaOrigem: string;
   categoryId?: number;
   observacoes?: string;
+  // NOVOS CAMPOS
+  estadoConservacao: string;
+  destinacao: string;
+  destinacaoObs?: string;
+  destinacaoChangedBy?: string;
+  destinacaoChangedAt?: string;
 }
 
 export interface CategoryStats {
@@ -106,4 +112,34 @@ export interface SearchFilters {
   origin?: string;
   startDate?: string;
   endDate?: string;
+  // NOVOS FILTROS
+  estadoConservacao?: string;
+  destinacao?: string;
 }
+
+// === Estado de Conservação ===
+export const ESTADO_CONSERVACAO_OPTIONS = [
+  { value: 'NAO_AVALIADO', label: 'Não avaliado' },
+  { value: 'NOVO_LACRADO', label: 'Novo/Lacrado' },
+  { value: 'SEMI_NOVO', label: 'Semi-novo' },
+  { value: 'USADO_FUNCIONANDO', label: 'Usado em funcionamento' },
+  { value: 'DANIFICADO', label: 'Danificado' },
+  { value: 'SEM_CONDICOES', label: 'Sem condições de avaliação' },
+] as const;
+
+export type EstadoConservacao = typeof ESTADO_CONSERVACAO_OPTIONS[number]['value'];
+
+export const getEstadoConservacaoLabel = (value: string): string =>
+  ESTADO_CONSERVACAO_OPTIONS.find(o => o.value === value)?.label || value;
+
+// === Destinação ===
+export const DESTINACAO_OPTIONS = [
+  { value: 'NAO_INICIADO', label: 'Não iniciado' },
+  { value: 'SOLICITADO', label: 'Solicitado' },
+  { value: 'FINALIZADO', label: 'Finalizado' },
+] as const;
+
+export type Destinacao = typeof DESTINACAO_OPTIONS[number]['value'];
+
+export const getDestinacaoLabel = (value: string): string =>
+  DESTINACAO_OPTIONS.find(o => o.value === value)?.label || value;

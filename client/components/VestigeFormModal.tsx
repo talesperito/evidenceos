@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vestige } from '../types';
+import { Vestige, ESTADO_CONSERVACAO_OPTIONS, DESTINACAO_OPTIONS } from '../types';
 import { XIcon } from './icons/XIcon';
 
 interface VestigeFormModalProps {
@@ -21,7 +21,11 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     fav: '',
     municipio: 'Lavras',
     data: new Date().toLocaleDateString('pt-BR'),
-    planilhaOrigem: 'Geral'
+    planilhaOrigem: 'Geral',
+    // NOVOS CAMPOS
+    estadoConservacao: 'NAO_AVALIADO',
+    destinacao: 'NAO_INICIADO',
+    destinacaoObs: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -171,6 +175,54 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                  {options.origins.map(o => <option key={o} value={o}>{o}</option>)}
                </select>
             </div>
+
+            {/* Linha 5 — Novos Campos */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">ESTADO DE CONSERVAÇÃO</label>
+              <select
+                required
+                value={formData.estadoConservacao}
+                onChange={e => handleChange('estadoConservacao' as keyof Vestige, e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none appearance-none"
+              >
+                {ESTADO_CONSERVACAO_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">DESTINAÇÃO</label>
+              <select
+                required
+                value={formData.destinacao}
+                onChange={e => handleChange('destinacao' as keyof Vestige, e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none appearance-none"
+              >
+                {DESTINACAO_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Campo condicional de observação da destinação */}
+            {(formData.destinacao === 'SOLICITADO' || formData.destinacao === 'FINALIZADO') && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  {formData.destinacao === 'SOLICITADO'
+                    ? 'OBSERVAÇÃO DA SOLICITAÇÃO (Quem solicitou e motivo)'
+                    : 'DADOS DA FINALIZAÇÃO'}
+                </label>
+                <textarea
+                  required
+                  value={formData.destinacaoObs || ''}
+                  onChange={e => handleChange('destinacaoObs' as keyof Vestige, e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none h-20 resize-none"
+                  placeholder={formData.destinacao === 'SOLICITADO'
+                    ? 'Ex: Solicitado por Del. João Silva - Ofício 123/2026 - Restituição ao proprietário'
+                    : 'Ex: Entregue ao requisitante em 15/04/2026 - Protocolo 456/2026'}
+                />
+              </div>
+            )}
 
           </div>
 

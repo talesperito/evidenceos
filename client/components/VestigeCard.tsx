@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Vestige, User, canDeleteVestige, canEditVestige } from '../types';
+import { Vestige, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -81,7 +81,7 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
              
              {/* Ações Administrativas (Editar/Excluir) */}
              {canEdit && (
-                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                 <div className="flex items-center gap-1 transition-opacity">
                      <button 
                         onClick={() => onEdit && onEdit(vestige)}
                         className="p-1.5 text-zinc-400 hover:text-white hover:bg-white/10 rounded transition-colors"
@@ -128,6 +128,38 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
         <div className="col-span-2 md:col-span-1">
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Tempo de Custódia</p>
           <p className="font-bold text-lg text-amber-500 leading-tight">{custodyTime}</p>
+        </div>
+        
+        {/* Estado de Conservação */}
+        <div>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Conservação</p>
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+            vestige.estadoConservacao === 'NAO_AVALIADO' ? 'bg-zinc-700 text-zinc-300' :
+            vestige.estadoConservacao === 'NOVO_LACRADO' ? 'bg-emerald-500/20 text-emerald-400' :
+            vestige.estadoConservacao === 'SEMI_NOVO' ? 'bg-blue-500/20 text-blue-400' :
+            vestige.estadoConservacao === 'USADO_FUNCIONANDO' ? 'bg-amber-500/20 text-amber-400' :
+            vestige.estadoConservacao === 'DANIFICADO' ? 'bg-red-500/20 text-red-400' :
+            'bg-orange-500/20 text-orange-400'
+          }`}>
+            {getEstadoConservacaoLabel(vestige.estadoConservacao)}
+          </span>
+        </div>
+
+        {/* Destinação */}
+        <div>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Destinação</p>
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+            vestige.destinacao === 'NAO_INICIADO' ? 'bg-zinc-700 text-zinc-300' :
+            vestige.destinacao === 'SOLICITADO' ? 'bg-yellow-500/20 text-yellow-400' :
+            'bg-green-500/20 text-green-400'
+          }`}>
+            {getDestinacaoLabel(vestige.destinacao)}
+          </span>
+          {vestige.destinacaoObs && (
+            <p className="text-[10px] text-zinc-400 mt-1 italic truncate max-w-[200px]" title={vestige.destinacaoObs}>
+              {vestige.destinacaoObs}
+            </p>
+          )}
         </div>
       </div>
       

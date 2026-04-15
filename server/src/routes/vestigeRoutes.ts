@@ -3,17 +3,28 @@ import { z } from 'zod';
 import { prisma } from '../db/connection';
 import { auditService } from '../services/auditService';
 
+const VALID_ESTADO_CONSERVACAO = [
+  'NAO_AVALIADO', 'NOVO_LACRADO', 'SEMI_NOVO',
+  'USADO_FUNCIONANDO', 'DANIFICADO', 'SEM_CONDICOES'
+];
+
+const VALID_DESTINACAO = ['NAO_INICIADO', 'SOLICITADO', 'FINALIZADO'];
+
 export async function vestigeRoutes(server: FastifyInstance) {
   const querySchema = z.object({
     page: z.string().optional().transform(v => Number(v) || 1),
     limit: z.string().optional().transform(v => Number(v) || 50),
     category: z.string().optional(),
     search: z.string().optional(),
+    estadoConservacao: z.string().optional(),
+    destinacao: z.string().optional(),
   });
 
-  const buildWhereClause = (category?: string, search?: string) => {
+  const buildWhereClause = (category?: string, search?: string, estadoConservacao?: string, destinacao?: string) => {
     const where: Record<string, unknown> = { deletedAt: null };
     if (category) where.categoryId = Number(category);
+    if (estadoConservacao) where.estadoConservacao = estadoConservacao;
+    if (destinacao) where.destinacao = destinacao;
     if (search) {
       where.OR = [
         { material: { contains: search, mode: 'insensitive' } },
@@ -44,9 +55,9 @@ export async function vestigeRoutes(server: FastifyInstance) {
   };
 
   server.get('/', async (request) => {
-    const { page, limit, category, search } = querySchema.parse(request.query);
+    const { page, limit, category, search, estadoConservacao, destinacao } = querySchema.parse(request.query);
     const skip = (page - 1) * limit;
-    const where = buildWhereClause(category, search);
+    const where = buildWhereClause(category, search, estadoConservacao, destinacao);
 
     const [items, total] = await Promise.all([
       prisma.vestige.findMany({
@@ -71,9 +82,9 @@ export async function vestigeRoutes(server: FastifyInstance) {
   });
 
   server.get('/search', async (request) => {
-    const { page, limit, category, search } = querySchema.parse(request.query);
+    const { page, limit, category, search, estadoConservacao, destinacao } = querySchema.parse(request.query);
     const skip = (page - 1) * limit;
-    const where = buildWhereClause(category, search);
+    const where = buildWhereClause(category, search, estadoConservacao, destinacao);
 
     const [items, total] = await Promise.all([
       prisma.vestige.findMany({
@@ -152,6 +163,8 @@ export async function vestigeRoutes(server: FastifyInstance) {
       municipio: z.string().default('Lavras'),
       dataColeta: z.string().optional().transform(v => v ? new Date(v) : null),
       observacoes: z.string().optional(),
+      estadoConservacao: z.enum(VALID_ESTADO_CONSERVACAO as [string, ...string[]]).default('NAO_AVALIADO'),
+      destinacao: z.enum(VALID_DESTINACAO as [string, ...string[]]).default('NAO_INICIADO'),
     });
 
     const data = vestigeSchema.parse(request.body);
@@ -192,9 +205,34 @@ export async function vestigeRoutes(server: FastifyInstance) {
       municipio: z.string().optional(),
       dataColeta: z.string().optional().transform(v => v ? new Date(v) : null),
       observacoes: z.string().optional(),
+      estadoConservacao: z.enum(VALID_ESTADO_CONSERVACAO as [string, ...string[]]).optional(),
+      destinacao: z.enum(VALID_DESTINACAO as [string, ...string[]]).optional(),
+      destinacaoObs: z.string().optional(),
     });
 
     const data = updateSchema.parse(request.body);
+
+    if (data.destinacao) {
+      const current = await prisma.vestige.findUnique({
+        where: { id },
+        select: { destinacao: true },
+      });
+
+      if (current && current.destinacao !== data.destinacao) {
+        await prisma.vestigeDestinationLog.create({
+          data: {
+            vestigeId: id,
+            fromStatus: current.destinacao,
+            toStatus: data.destinacao,
+            observation: data.destinacaoObs || null,
+            changedBy: user.id,
+          },
+        });
+
+        (data as any).destinacaoChangedBy = user.id;
+        (data as any).destinacaoChangedAt = new Date();
+      }
+    }
 
     const vestige = await prisma.vestige.update({
       where: { id },
@@ -217,6 +255,28 @@ export async function vestigeRoutes(server: FastifyInstance) {
     });
 
     return vestige;
+  });
+
+  server.get('/:id/destination-history', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const logs = await prisma.vestigeDestinationLog.findMany({
+      where: { vestigeId: id },
+      orderBy: { changedAt: 'desc' },
+      include: {
+        user: { select: { name: true, email: true } },
+      },
+    });
+
+    return logs.map((log: any) => ({
+      id: String(log.id),
+      fromStatus: log.fromStatus,
+      toStatus: log.toStatus,
+      observation: log.observation,
+      changedBy: log.user.name,
+      changedByEmail: log.user.email,
+      changedAt: log.changedAt.toISOString(),
+    }));
   });
 
   server.delete('/:id', { preHandler: requireAdminAccess }, async (request, reply) => {

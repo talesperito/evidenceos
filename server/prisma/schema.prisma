@@ -20,10 +20,12 @@ model User {
   deletedAt     DateTime? @map("deleted_at")
 
   // Relations
-  createdVestiges Vestige[]  @relation("CreatedBy")
-  updatedVestiges Vestige[]  @relation("UpdatedBy")
-  auditLogs       AuditLog[]
-  sessions        Session[]
+  createdVestiges     Vestige[]               @relation("CreatedBy")
+  updatedVestiges     Vestige[]               @relation("UpdatedBy")
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  destinationChanges  VestigeDestinationLog[]
+  changedDestinations Vestige[]               @relation("DestinationChangedBy")
 
   @@map("users")
   @@schema("public")
@@ -64,16 +66,42 @@ model Vestige {
   updatedAt     DateTime  @updatedAt @map("updated_at")
   deletedAt     DateTime? @map("deleted_at")
 
+  // Estado de Conservação e Destinação
+  estadoConservacao   String    @default("NAO_AVALIADO") @map("estado_conservacao")
+  destinacao          String    @default("NAO_INICIADO")
+  destinacaoObs       String?   @map("destinacao_obs")
+  destinacaoChangedBy String?   @map("destinacao_changed_by")
+  destinacaoChangedAt DateTime? @map("destinacao_changed_at")
+
   // Controle de importação
   importedFrom  String    @default("google_sheets") @map("imported_from")
   importedAt    DateTime? @map("imported_at")
 
   // Relations
-  category      VestigeCategory @relation(fields: [categoryId], references: [id])
-  creator       User?           @relation("CreatedBy", fields: [createdBy], references: [id])
-  updater       User?           @relation("UpdatedBy", fields: [updatedBy], references: [id])
+  category           VestigeCategory         @relation(fields: [categoryId], references: [id])
+  creator            User?                   @relation("CreatedBy", fields: [createdBy], references: [id])
+  updater            User?                   @relation("UpdatedBy", fields: [updatedBy], references: [id])
+  destinationLogs    VestigeDestinationLog[]
+  destinationChanger User?                   @relation("DestinationChangedBy", fields: [destinacaoChangedBy], references: [id])
 
   @@map("vestiges")
+  @@schema("public")
+}
+
+model VestigeDestinationLog {
+  id          BigInt   @id @default(autoincrement())
+  vestigeId   String   @map("vestige_id")
+  fromStatus  String?  @map("from_status")
+  toStatus    String   @map("to_status")
+  observation String?
+  changedBy   String   @map("changed_by")
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  // Relations
+  vestige     Vestige  @relation(fields: [vestigeId], references: [id])
+  user        User     @relation(fields: [changedBy], references: [id])
+
+  @@map("vestige_destination_logs")
   @@schema("public")
 }
 

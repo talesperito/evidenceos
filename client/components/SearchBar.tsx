@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
-import { SearchFilters } from '../types';
+import { SearchFilters, ESTADO_CONSERVACAO_OPTIONS, DESTINACAO_OPTIONS } from '../types';
 
 interface SearchBarProps {
   onSearch: (filters: SearchFilters) => void;
@@ -21,6 +21,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
   const [endDate, setEndDate] = useState('');
   const [selectedMunicipio, setSelectedMunicipio] = useState('');
   const [selectedOrigin, setSelectedOrigin] = useState('');
+  const [estadoConservacao, setEstadoConservacao] = useState('');
+  const [destinacao, setDestinacao] = useState('');
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +31,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
         field: 'all',
         municipio: selectedMunicipio,
         origin: selectedOrigin,
+        estadoConservacao,
+        destinacao,
         startDate,
         endDate
     });
@@ -39,6 +43,8 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
     setEndDate('');
     setSelectedMunicipio('');
     setSelectedOrigin('');
+    setEstadoConservacao('');
+    setDestinacao('');
     setQuery('');
   };
 
@@ -88,7 +94,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
             {/* Advanced Filters Panel */}
             {isAdvancedOpen && (
                 <div className="mt-4 pt-4 border-t border-slate-700 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
                         
                         {/* Filtro: Tipo de Material (Origem) */}
                         <div>
@@ -144,6 +150,38 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
                                 disabled={isLoading}
                                 className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none disabled:opacity-50"
                             />
+                        </div>
+
+                        {/* Filtro: Conservação */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">CONSERVAÇÃO</label>
+                            <select
+                                value={estadoConservacao}
+                                onChange={(e) => setEstadoConservacao(e.target.value)}
+                                disabled={isLoading}
+                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none disabled:opacity-50 appearance-none"
+                            >
+                                <option value="">Todos</option>
+                                {ESTADO_CONSERVACAO_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Filtro: Destinação */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-400 mb-1">DESTINAÇÃO</label>
+                            <select
+                                value={destinacao}
+                                onChange={(e) => setDestinacao(e.target.value)}
+                                disabled={isLoading}
+                                className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none disabled:opacity-50 appearance-none"
+                            >
+                                <option value="">Todos</option>
+                                {DESTINACAO_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
                         </div>
 
                     </div>

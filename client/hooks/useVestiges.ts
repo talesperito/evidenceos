@@ -147,7 +147,17 @@ export const useVestiges = () => {
         }
       }
 
-      return matchesTerm && matchesMunicipio && matchesOrigin && matchesDate;
+      let matchesConservacao = true;
+      if (filters.estadoConservacao) {
+        matchesConservacao = vestige.estadoConservacao === filters.estadoConservacao;
+      }
+
+      let matchesDestinacao = true;
+      if (filters.destinacao) {
+        matchesDestinacao = vestige.destinacao === filters.destinacao;
+      }
+
+      return matchesTerm && matchesMunicipio && matchesOrigin && matchesDate && matchesConservacao && matchesDestinacao;
     });
 
     setFilteredVestiges(results);

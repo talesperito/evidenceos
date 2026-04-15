@@ -17,6 +17,12 @@ interface ApiVestige {
   dataColeta?: string | null;
   observacoes?: string | null;
   category?: ApiCategory | null;
+  // NOVOS CAMPOS
+  estadoConservacao: string;
+  destinacao: string;
+  destinacaoObs?: string | null;
+  destinacaoChangedBy?: string | null;
+  destinacaoChangedAt?: string | null;
 }
 
 const formatDate = (value?: string | null) => {
@@ -45,6 +51,12 @@ const mapVestige = (item: ApiVestige): Vestige => ({
   data: formatDate(item.dataColeta),
   planilhaOrigem: item.category?.name || 'Sem categoria',
   observacoes: item.observacoes || '',
+  // NOVOS CAMPOS
+  estadoConservacao: item.estadoConservacao || 'NAO_AVALIADO',
+  destinacao: item.destinacao || 'NAO_INICIADO',
+  destinacaoObs: item.destinacaoObs || undefined,
+  destinacaoChangedBy: item.destinacaoChangedBy || undefined,
+  destinacaoChangedAt: item.destinacaoChangedAt || undefined,
 });
 
 let categoryCache: ApiCategory[] | null = null;
@@ -74,6 +86,10 @@ const buildPayload = async (vestige: Partial<Vestige>) => ({
   municipio: vestige.municipio || 'Lavras',
   dataColeta: parseDate(vestige.data),
   observacoes: vestige.observacoes || undefined,
+  // NOVOS CAMPOS
+  estadoConservacao: vestige.estadoConservacao || undefined,
+  destinacao: vestige.destinacao || undefined,
+  destinacaoObs: vestige.destinacaoObs || undefined,
 });
 
 export const fetchAllVestiges = async (): Promise<Vestige[]> => {
@@ -112,4 +128,18 @@ export const updateVestige = async (id: string, vestige: Partial<Vestige>): Prom
 
 export const deleteVestige = async (id: string): Promise<void> => {
   await apiRequest(`/api/vestiges/${id}`, { method: 'DELETE' });
+};
+
+export interface DestinationLogEntry {
+  id: string;
+  fromStatus: string | null;
+  toStatus: string;
+  observation: string | null;
+  changedBy: string;
+  changedByEmail: string;
+  changedAt: string;
+}
+
+export const fetchDestinationHistory = async (vestigeId: string): Promise<DestinationLogEntry[]> => {
+  return apiRequest<DestinationLogEntry[]>(`/api/vestiges/${vestigeId}/destination-history`);
 };
