@@ -4,63 +4,77 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EvidenceOS – URC Lavras/MG</title>
-    <!-- Mantendo Tailwind via CDN para facilitar a configuração inicial sem build step de CSS complexo -->
+    <title>EvidenceOS - URC Lavras/MG</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* Custom scrollbar for a better look in dark mode */
       ::-webkit-scrollbar {
         width: 8px;
       }
+
       ::-webkit-scrollbar-track {
-        background: #09090b; /* zinc-950 */
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #3f3f46; /* zinc-700 */
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #52525b; /* zinc-600 */
+        background: #09090b;
       }
 
-      /* BACKGROUND GLOBAL SOFISTICADO */
+      ::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 4px;
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: #52525b;
+      }
+
       body {
-        background-color: #09090b; /* Zinc 950 base */
-        background-image: 
+        background-color: #09090b;
+        background-image:
           radial-gradient(at 0% 0%, rgba(251, 191, 36, 0.03) 0px, transparent 50%),
           radial-gradient(at 100% 100%, rgba(251, 191, 36, 0.03) 0px, transparent 50%),
-          linear-gradient(to bottom, rgba(255,255,255,0.01) 1px, transparent 1px),
-          linear-gradient(to right, rgba(255,255,255,0.01) 1px, transparent 1px);
+          linear-gradient(to bottom, rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+          linear-gradient(to right, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
         background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
         background-attachment: fixed;
       }
 
-      /* PRINT STYLES FOR PDF GENERATION */
       @media print {
         @page {
           margin: 1cm;
           size: A4;
         }
-        
-        /* 1. REGRA GERAL: Esconde tudo por padrão */
+
+        html,
+        body,
+        #root {
+          height: auto !important;
+          overflow: visible !important;
+        }
+
         body * {
           visibility: hidden;
         }
 
-        /* 2. EXCEÇÃO PARA O MODAL DE RELATÓRIO (Se estiver aberto) */
-        #report-modal-container, 
+        #report-modal-container,
         #report-modal-container * {
           visibility: visible;
         }
 
-        /* 3. EXCEÇÃO PARA OS CARDS (Se estiver na tela de busca) */
-        /* Só mostra se NÃO tiver o modal aberto (usando uma lógica de CSS baseada em visibilidade) */
-        .vestige-card, .vestige-card * {
-           visibility: visible;
+        .vestige-card,
+        .vestige-card * {
+          visibility: visible;
         }
 
-        /* Reset Geral de Cores para Impressão */
-        body, #root, main, div, table, th, td, p, span, h1, h2, h3, h4 {
+        body,
+        #root,
+        main,
+        div,
+        table,
+        th,
+        td,
+        p,
+        span,
+        h1,
+        h2,
+        h3,
+        h4 {
           background-color: transparent !important;
           color: black !important;
           -webkit-print-color-adjust: exact !important;
@@ -69,85 +83,136 @@
           text-shadow: none !important;
         }
 
-        /* --- CONFIGURAÇÃO ESPECÍFICA DO MODAL DE RELATÓRIO --- */
+        .no-print-backdrop {
+          position: static !important;
+          inset: auto !important;
+          display: block !important;
+          height: auto !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+          background: white !important;
+          backdrop-filter: none !important;
+        }
+
         #report-modal-container {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            height: auto !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            overflow: visible !important; /* CRUCIAL: Permite que o conteúdo quebre páginas */
-            max-height: none !important;
-            border: none !important;
-            background: white !important;
+          position: static !important;
+          width: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+          max-height: none !important;
+          max-width: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+          background: white !important;
+          box-shadow: none !important;
+          display: block !important;
         }
 
-        /* Ajustes de Tabela no Relatório */
+        #report-modal-container > div {
+          display: block !important;
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+
+        #report-modal-container section {
+          break-inside: auto !important;
+          page-break-inside: auto !important;
+        }
+
         #report-modal-container table {
-            width: 100% !important;
-            border-collapse: collapse !important;
-            margin-top: 10px !important;
-        }
-        #report-modal-container th {
-            background-color: #f0f0f0 !important;
-            color: black !important;
-            border: 1px solid #999 !important;
-        }
-        #report-modal-container td {
-            border: 1px solid #ddd !important;
-            color: black !important;
+          width: 100% !important;
+          border-collapse: collapse !important;
+          margin-top: 10px !important;
+          page-break-inside: auto !important;
         }
 
-        /* Esconde Botões e Decorações no Modo Impressão */
-        .no-print, 
-        button, 
-        .fixed-backdrop {
+        #report-modal-container thead {
+          display: table-header-group !important;
+        }
+
+        #report-modal-container tfoot {
+          display: table-footer-group !important;
+        }
+
+        #report-modal-container tr {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+
+        #report-modal-container th {
+          background-color: #f0f0f0 !important;
+          color: black !important;
+          border: 1px solid #999 !important;
+        }
+
+        #report-modal-container td {
+          border: 1px solid #ddd !important;
+          color: black !important;
+        }
+
+        .no-print,
+        button,
+        .fixed-backdrop:not(.no-print-backdrop) {
           display: none !important;
         }
 
-        /* Títulos e Labels */
-        .text-slate-400, .text-slate-500 {
-            color: #444 !important;
+        .text-slate-400,
+        .text-slate-500 {
+          color: #444 !important;
         }
-        .text-cyan-400, .text-cyan-200 {
-            color: #000 !important;
-            font-weight: bold !important;
-        }
-        
-        /* Sparklines e Cores de Fundo (Tentativa de manter legibilidade em P&B) */
-        .bg-red-500 { background-color: #aa0000 !important; -webkit-print-color-adjust: exact; }
-        .bg-orange-400 { background-color: #cc6600 !important; -webkit-print-color-adjust: exact; }
-        .bg-emerald-500 { background-color: #008800 !important; -webkit-print-color-adjust: exact; }
 
-        /* Rodapé do Relatório */
+        .text-cyan-400,
+        .text-cyan-200 {
+          color: #000 !important;
+          font-weight: bold !important;
+        }
+
+        .bg-red-500 {
+          background-color: #aa0000 !important;
+          -webkit-print-color-adjust: exact;
+        }
+
+        .bg-orange-400 {
+          background-color: #cc6600 !important;
+          -webkit-print-color-adjust: exact;
+        }
+
+        .bg-emerald-500 {
+          background-color: #008800 !important;
+          -webkit-print-color-adjust: exact;
+        }
+
         #report-modal-container::after {
-            content: "Relatório gerado pelo EvidenceOS - URC Lavras/MG";
-            display: block;
-            text-align: center;
-            font-size: 10px;
-            color: #666;
-            margin-top: 30px;
-            border-top: 1px solid #ccc;
-            padding-top: 10px;
+          content: "Relatorio gerado pelo EvidenceOS - URC Lavras/MG";
+          display: block;
+          text-align: center;
+          font-size: 10px;
+          color: #666;
+          margin-top: 30px;
+          border-top: 1px solid #ccc;
+          padding-top: 10px;
         }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@^19.2.3",
+          "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+          "vite": "https://esm.sh/vite@^7.3.1",
+          "react/": "https://esm.sh/react@^19.2.3/",
+          "react-dom": "https://esm.sh/react-dom@^19.2.3",
+          "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/index.css" />
+  </head>
   <body class="text-zinc-200 antialiased selection:bg-amber-500/30 selection:text-amber-200">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

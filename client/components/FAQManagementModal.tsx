@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getFAQs, saveFAQ, deleteFAQ, resetFAQs } from '../services/faqService';
+import { getFAQs, saveFAQ, deleteFAQ, isPersistedFAQId, resetFAQs } from '../services/faqService';
 import { FAQItem } from '../data/faqData';
 import { XIcon } from './icons/XIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -27,7 +27,7 @@ const FAQManagementModal: React.FC<FAQManagementModalProps> = ({ onClose }) => {
   const loadData = async () => {
     try {
       setError(null);
-      setFaqs(await getFAQs());
+      setFaqs(await getFAQs(true));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao carregar normas.');
     }
@@ -187,15 +187,25 @@ const FAQManagementModal: React.FC<FAQManagementModalProps> = ({ onClose }) => {
             </div>
 
             <div className="space-y-3">
-              {faqs.map((item) => (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded border transition-all ${editingId === item.id ? 'bg-cyan-900/10 border-cyan-500/50' : 'bg-slate-800 border-slate-700 hover:border-slate-600'}`}
-                >
+              {faqs.map((item) => {
+                const isPersisted = isPersistedFAQId(item.id);
+
+                return (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded border transition-all ${editingId === item.id ? 'bg-cyan-900/10 border-cyan-500/50' : 'bg-slate-800 border-slate-700 hover:border-slate-600'}`}
+                  >
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[10px] uppercase font-bold text-cyan-500 bg-cyan-950 px-2 py-0.5 rounded">
-                      {item.category}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] uppercase font-bold text-cyan-500 bg-cyan-950 px-2 py-0.5 rounded">
+                        {item.category}
+                      </span>
+                      {!isPersisted && (
+                        <span className="text-[10px] uppercase font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          PadrÃ£o do sistema
+                        </span>
+                      )}
+                    </div>
                     <div className="flex gap-1">
                       <button
                         onClick={() => handleEdit(item)}
@@ -206,8 +216,13 @@ const FAQManagementModal: React.FC<FAQManagementModalProps> = ({ onClose }) => {
                       </button>
                       <button
                         onClick={() => void handleDelete(item.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                        title="Excluir"
+                        disabled={!isPersisted}
+                        className={`p-1.5 rounded transition-colors ${
+                          isPersisted
+                            ? 'text-slate-400 hover:text-red-400 hover:bg-slate-700'
+                            : 'text-slate-600 cursor-not-allowed'
+                        }`}
+                        title={isPersisted ? 'Excluir' : 'Itens padrÃ£o sÃ³ podem ser removidos apÃ³s serem importados'}
                       >
                         <TrashIcon className="w-4 h-4" />
                       </button>
@@ -215,8 +230,9 @@ const FAQManagementModal: React.FC<FAQManagementModalProps> = ({ onClose }) => {
                   </div>
                   <h4 className="font-semibold text-slate-200 text-sm mb-1">{item.question}</h4>
                   <p className="text-xs text-slate-400 line-clamp-2">{item.answer}</p>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
 
               {faqs.length === 0 && (
                 <div className="text-center py-10 text-slate-500">

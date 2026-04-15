@@ -13,22 +13,62 @@ interface ApiStandard {
   version?: string | null;
 }
 
-const mapStandard = (item: ApiStandard): FAQItem => ({
+interface FAQRecord extends FAQItem {
+  code: string;
+}
+
+const mapStandard = (item: ApiStandard): FAQRecord => ({
   id: String(item.id),
   category: item.category || 'Geral',
   question: item.title,
   answer: item.fullText || item.description || '',
+  code: item.code,
 });
 
 const createCode = (faq: Omit<FAQItem, 'id'>) =>
   `${faq.category}-${faq.question}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+const toFaqItem = ({ code, ...item }: FAQRecord): FAQItem => item;
+
+const buildDefaultFAQs = (): FAQRecord[] =>
+  FAQ_DATA.map((item) => {
+    const code = createCode({
+      category: item.category,
+      question: item.question,
+      answer: item.answer,
+    });
+
+    return {
+      id: `default:${code}`,
+      category: item.category,
+      question: item.question,
+      answer: item.answer,
+      code,
+    };
+  });
+
+export const isPersistedFAQId = (id: string): boolean => /^\d+$/.test(id);
+
 export const getFAQs = async (fallbackToDefaults = false): Promise<FAQItem[]> => {
   const standards = await apiRequest<ApiStandard[]>('/api/custody-standards');
-  if (standards.length === 0 && fallbackToDefaults) {
-    return FAQ_DATA;
+  const mappedStandards = standards.map(mapStandard);
+
+  if (!fallbackToDefaults) {
+    return mappedStandards.map(toFaqItem);
   }
-  return standards.map(mapStandard);
+
+  const defaultFAQs = buildDefaultFAQs();
+  if (mappedStandards.length === 0) {
+    return defaultFAQs.map(toFaqItem);
+  }
+
+  const persistedCodes = new Set(mappedStandards.map((item) => item.code));
+  const merged = [
+    ...mappedStandards,
+    ...defaultFAQs.filter((item) => !persistedCodes.has(item.code)),
+  ];
+
+  return merged.map(toFaqItem);
 };
 
 export const saveFAQ = async (faq: Omit<FAQItem, 'id'> & { id?: string }): Promise<void> => {
@@ -41,7 +81,7 @@ export const saveFAQ = async (faq: Omit<FAQItem, 'id'> & { id?: string }): Promi
     active: true,
   };
 
-  if (faq.id && /^\d+$/.test(faq.id)) {
+  if (faq.id && isPersistedFAQId(faq.id)) {
     await apiRequest(`/api/custody-standards/${faq.id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
@@ -56,9 +96,10 @@ export const saveFAQ = async (faq: Omit<FAQItem, 'id'> & { id?: string }): Promi
 };
 
 export const deleteFAQ = async (id: string): Promise<void> => {
-  if (!/^\d+$/.test(id)) {
-    throw new Error('Este item padrão ainda não foi importado para o banco.');
+  if (!isPersistedFAQId(id)) {
+    throw new Error('Este item padrao ainda nao foi importado para o banco.');
   }
+
   await apiRequest(`/api/custody-standards/${id}`, { method: 'DELETE' });
 };
 
@@ -66,7 +107,7 @@ export const resetFAQs = async (): Promise<void> => {
   const current = await getFAQs();
   await Promise.all(
     current
-      .filter((item) => /^\d+$/.test(item.id))
+      .filter((item) => isPersistedFAQId(item.id))
       .map((item) => deleteFAQ(item.id)),
   );
 
