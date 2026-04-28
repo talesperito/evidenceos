@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { User, getRoleLabel } from '../types';
-import { BookOpenIcon } from './icons/BookOpenIcon';
-import HelpModal from './HelpModal';
 import ChangePasswordModal from './ChangePasswordModal';
 
 const BalanceScaleIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -17,7 +15,6 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
-  const [showHelp, setShowHelp] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const roleLabel = getRoleLabel(user.role);
   const roleDotClass = user.role === 'ADMIN' ? 'bg-amber-500' : user.role === 'PERITO' ? 'bg-cyan-400' : 'bg-zinc-500';
@@ -37,17 +34,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
           </div>
 
           <div className="flex items-center gap-6">
-            <button
-              onClick={() => setShowHelp(true)}
-              className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 transition-colors group px-2 py-1 rounded-md hover:bg-white/5"
-              title="Normas e Procedimentos"
-            >
-              <BookOpenIcon className="w-5 h-5" />
-              <span className="text-sm font-medium hidden sm:block">Normas</span>
-            </button>
-
-            <div className="h-6 w-px bg-white/10 hidden sm:block"></div>
-
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setShowChangePassword(true)}
@@ -81,7 +67,6 @@ const Header: React.FC<HeaderProps> = ({ user, onLogout }) => {
         </div>
       </div>
 
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </header>
   );
