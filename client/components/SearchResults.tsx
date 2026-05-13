@@ -20,6 +20,7 @@ interface SearchResultsProps {
   // Visualização de Seleção
   isViewingSelection?: boolean;
   onBackToSearch?: () => void;
+  onViewSelection?: () => void;
   // Props para gestão (opcional se não tiver user)
   user?: User;
   onEdit?: (vestige: Vestige) => void;
@@ -37,12 +38,27 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     onToggleSelectAll,
     isViewingSelection,
     onBackToSearch,
+    onViewSelection,
     user,
     onEdit,
     onDelete
 }) => {
 
+  const selectedCount = Array.from(selectedIds).length;
+
   const handlePrint = () => {
+    if (!isViewingSelection && selectedCount > 0) {
+      const confirmed = window.confirm(
+        `Você tem ${selectedCount} item(ns) selecionado(s).\n\n` +
+        `• OK → Imprimir apenas os ${selectedCount} selecionados (recomendado)\n` +
+        `• Cancelar → Imprimir todos os ${vestiges.length} resultado(s) da busca`
+      );
+      if (confirmed && onViewSelection) {
+        onViewSelection();
+        setTimeout(() => window.print(), 300);
+        return;
+      }
+    }
     window.print();
   };
 

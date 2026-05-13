@@ -73,7 +73,7 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
         {/* Main Details */}
         <div className="col-span-2 md:col-span-3 lg:col-span-4 border-b border-white/5 pb-3 mb-1 flex justify-between items-start">
              <div>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Origem</p>
+                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Categoria</p>
                 <span className="font-semibold text-amber-500">{vestige.planilhaOrigem}</span>
                 {/* ID Discreto para debug se necessário */}
                 <p className="text-[10px] text-zinc-700 font-mono hidden sm:block mt-1">Ref: {vestige.id}</p>

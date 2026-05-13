@@ -12,10 +12,17 @@ if (!databaseUrl) {
   process.exit(1);
 }
 
-const email = process.env.BOOTSTRAP_ADMIN_EMAIL || 'admin@evidenceos.local';
-const password = process.env.BOOTSTRAP_ADMIN_PASSWORD || 'Admin@123456';
-const name = process.env.BOOTSTRAP_ADMIN_NAME || 'Administrador Local';
+const email = process.env.BOOTSTRAP_ADMIN_EMAIL;
+const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+const name = process.env.BOOTSTRAP_ADMIN_NAME || 'Administrador';
 const role = process.env.BOOTSTRAP_ADMIN_ROLE || 'ADMIN';
+
+if (!email || !password) {
+  console.error('[bootstrap-admin] ERRO: As variáveis de ambiente BOOTSTRAP_ADMIN_EMAIL e BOOTSTRAP_ADMIN_PASSWORD são obrigatórias.');
+  console.error('[bootstrap-admin] Exemplo de uso:');
+  console.error('  BOOTSTRAP_ADMIN_EMAIL=admin@exemplo.com BOOTSTRAP_ADMIN_PASSWORD=SenhaForte123 npm run bootstrap:admin');
+  process.exit(1);
+}
 
 async function main() {
   const client = new Client({ connectionString: databaseUrl });

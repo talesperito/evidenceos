@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import { User } from './types';
 import { logout, restoreSession } from './services/userService';
+
+// Detecta se o usuário está acessando via link de reset de senha
+const isResetPasswordRoute = (): boolean => {
+  const params = new URLSearchParams(window.location.search);
+  return params.has('token') || window.location.pathname.includes('/reset-password');
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [booting, setBooting] = useState(true);
+  const [showReset, setShowReset] = useState(isResetPasswordRoute());
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -26,6 +34,12 @@ const App: React.FC = () => {
     setUser(null);
   };
 
+  const handleBackToLogin = () => {
+    // Limpa o token da URL sem recarregar a página
+    window.history.replaceState({}, '', window.location.pathname.replace('/reset-password', '/'));
+    setShowReset(false);
+  };
+
   if (booting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-950 text-zinc-300">
@@ -39,10 +53,12 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen font-sans bg-transparent">
-      {user ? (
+      {showReset ? (
+        <ResetPasswordPage onBackToLogin={handleBackToLogin} />
+      ) : user ? (
         <Dashboard user={user} onLogout={handleLogout} />
       ) : (
-        <Login onLogin={setUser} />
+        <Login onLogin={setUser} onForgotPassword={() => setShowReset(true)} />
       )}
     </div>
   );

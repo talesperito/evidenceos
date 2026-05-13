@@ -205,6 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           onToggleSelectAll={handleToggleSelectAllVisible}
           isViewingSelection={isViewingSelection}
           onBackToSearch={() => setIsViewingSelection(false)}
+          onViewSelection={() => setIsViewingSelection(true)}
           user={user}
           onEdit={handleEdit}
           onDelete={(vestige) => void handleDelete(vestige)}

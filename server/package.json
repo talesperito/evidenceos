@@ -29,9 +29,11 @@
     "@fastify/static": "^9.1.0",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
+    "@types/nodemailer": "^8.0.0",
     "argon2": "^0.44.0",
     "dotenv": "^17.4.1",
     "fastify": "^5.8.4",
+    "nodemailer": "^8.0.7",
     "pg": "^8.20.0",
     "zod": "^4.3.6"
   },

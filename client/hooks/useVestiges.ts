@@ -80,11 +80,9 @@ export const useVestiges = () => {
 
   const searchVestiges = useCallback(async (filters: SearchFilters) => {
     setHasSearched(true);
-    let currentData = vestiges;
-
-    if (currentData.length === 0) {
-      currentData = await loadData();
-    }
+    // Sempre recarrega dados frescos do servidor para garantir consistência.
+    // Evita resultados desatualizados ao alterar filtros sem limpar a busca anterior.
+    const currentData = await loadData();
 
     const searchTerm = normalize(filters.term);
     const isNumericSearch = /^\d+$/.test(searchTerm);
@@ -161,7 +159,7 @@ export const useVestiges = () => {
     });
 
     setFilteredVestiges(results);
-  }, [loadData, vestiges]);
+  }, [loadData]);
 
   const generateReport = useCallback(async () => {
     let currentData = vestiges;

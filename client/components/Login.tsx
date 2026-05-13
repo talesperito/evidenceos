@@ -4,6 +4,7 @@ import { login } from '../services/userService';
 
 interface LoginProps {
   onLogin: (user: User) => void;
+  onForgotPassword: () => void;
 }
 
 const EyeIcon: React.FC<{ open: boolean }> = ({ open }) => (
@@ -22,7 +23,7 @@ const EyeIcon: React.FC<{ open: boolean }> = ({ open }) => (
   </svg>
 );
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onForgotPassword }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -172,6 +173,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   </svg>
                 </span>
                 <div className="absolute inset-0 bg-amber-500 transform translate-y-full transition-transform duration-200 group-hover:translate-y-0 z-0 opacity-20" />
+              </button>
+            </div>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+              >
+                Esqueci minha senha
               </button>
             </div>
           </form>

@@ -26,6 +26,7 @@ model User {
   sessions            Session[]
   destinationChanges  VestigeDestinationLog[]
   changedDestinations Vestige[]               @relation("DestinationChangedBy")
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
   @@schema("public")
@@ -158,5 +159,21 @@ model Session {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("sessions")
+  @@schema("public")
+}
+
+model PasswordResetToken {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  tokenHash     String    @map("token_hash") // hash SHA-256 do token em texto claro
+  expiresAt     DateTime  @map("expires_at")
+  usedAt        DateTime? @map("used_at")    // uso único: preenchido ao ser consumido
+  createdAt     DateTime  @default(now())    @map("created_at")
+  createdByIp   String?   @map("created_by_ip")
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
   @@schema("public")
 }

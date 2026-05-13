@@ -108,6 +108,48 @@ export async function vestigeRoutes(server: FastifyInstance) {
     };
   });
 
+  server.get('/check-duplicate', async (request) => {
+    const schema = z.object({
+      involucro: z.string().optional(),
+      requisicao: z.string().optional(),
+      excludeId: z.string().optional(), // ID do vestígio atual em caso de edição
+    });
+
+    const { involucro, requisicao, excludeId } = schema.parse(request.query);
+
+    const duplicates: { field: string; value: string; vestigeId: string; material: string; registroFav: string | null }[] = [];
+
+    if (involucro && involucro.trim() !== '') {
+      const found = await prisma.vestige.findFirst({
+        where: {
+          involucro,
+          deletedAt: null,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true, material: true, registroFav: true },
+      });
+      if (found) {
+        duplicates.push({ field: 'involucro', value: involucro, vestigeId: found.id, material: found.material, registroFav: found.registroFav });
+      }
+    }
+
+    if (requisicao && requisicao.trim() !== '') {
+      const found = await prisma.vestige.findFirst({
+        where: {
+          requisicao,
+          deletedAt: null,
+          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        },
+        select: { id: true, material: true, registroFav: true },
+      });
+      if (found) {
+        duplicates.push({ field: 'requisicao', value: requisicao, vestigeId: found.id, material: found.material, registroFav: found.registroFav });
+      }
+    }
+
+    return { duplicates };
+  });
+
   server.get('/stats', async () => {
     const total = await prisma.vestige.count({ where: { deletedAt: null } });
     const statsByCategory = await prisma.vestige.groupBy({
@@ -283,9 +325,17 @@ export async function vestigeRoutes(server: FastifyInstance) {
     const { id } = request.params as { id: string };
     const user = request.user as any;
 
+    const existing = await prisma.vestige.findFirst({
+      where: { id, deletedAt: null },
+    });
+
+    if (!existing) {
+      return reply.status(404).send({ message: 'Vestígio não encontrado ou já excluído.' });
+    }
+
     await prisma.vestige.update({
       where: { id },
-      data: { deletedAt: new Date() },
+      data: { deletedAt: new Date(), updatedBy: user.id },
     });
 
     await auditService.log({
@@ -295,6 +345,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       action: 'DELETE',
       targetType: 'vestige',
       targetId: id,
+      details: { material: existing.material, registroFav: existing.registroFav },
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
     });

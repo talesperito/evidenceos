@@ -143,3 +143,27 @@ export interface DestinationLogEntry {
 export const fetchDestinationHistory = async (vestigeId: string): Promise<DestinationLogEntry[]> => {
   return apiRequest<DestinationLogEntry[]>(`/api/vestiges/${vestigeId}/destination-history`);
 };
+
+export interface DuplicateAlert {
+  field: 'involucro' | 'requisicao';
+  value: string;
+  vestigeId: string;
+  material: string;
+  registroFav: string | null;
+}
+
+export const checkDuplicate = async (
+  involucro?: string,
+  requisicao?: string,
+  excludeId?: string,
+): Promise<DuplicateAlert[]> => {
+  const params = new URLSearchParams();
+  if (involucro) params.append('involucro', involucro);
+  if (requisicao) params.append('requisicao', requisicao);
+  if (excludeId) params.append('excludeId', excludeId);
+
+  const result = await apiRequest<{ duplicates: DuplicateAlert[] }>(
+    `/api/vestiges/check-duplicate?${params.toString()}`,
+  );
+  return result.duplicates;
+};
