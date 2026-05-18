@@ -54,7 +54,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
       alert(`ACESSO NEGADO: O recurso "${actionName}" é restrito a Administradores.\n\nContate a chefia da URC para solicitar acesso.`);
       return;
     }
-
     try {
       await logAction(user, actionName, 'Acesso autorizado ao recurso.');
     } catch {
@@ -63,17 +62,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
     callback();
   };
 
-  const getButtonStyle = (baseClass: string, actionName: string) =>
-    hasPermission(actionName)
-      ? baseClass
-      : `${baseClass} opacity-60 cursor-not-allowed grayscale`;
+  // Botão utilitário ativo: zinc escuro, hover sutil
+  const activeBtn =
+    'group flex items-center justify-center gap-2 px-4 py-3 ' +
+    'bg-zinc-800/70 hover:bg-zinc-700/80 ' +
+    'border border-white/5 hover:border-white/15 ' +
+    'text-zinc-300 hover:text-white ' +
+    'font-semibold rounded-xl ' +
+    'shadow-md hover:shadow-lg ' +
+    'transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 ' +
+    'w-full';
+
+  // Botão bloqueado: mudo, sem interação
+  const lockedBtn =
+    'flex items-center justify-center gap-2 px-4 py-3 ' +
+    'bg-zinc-900/30 border border-zinc-800/40 ' +
+    'text-zinc-700 font-semibold rounded-xl ' +
+    'cursor-not-allowed opacity-40 w-full';
+
+  const btn = (allowed: boolean) => allowed ? activeBtn : lockedBtn;
 
   return (
-    <div className="mb-6 p-4 bg-slate-800 rounded-lg border border-slate-700 relative overflow-hidden">
+    <div className="mb-6 p-5 bg-zinc-900/60 backdrop-blur-md rounded-2xl border border-white/10 shadow-2xl relative overflow-hidden">
+      {/* Linha de brilho sutil no topo do card */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
       {!canManageUsers(user) && (
-        <div className="absolute top-0 right-0 p-2">
+        <div className="absolute top-0 right-0 p-3">
           <span
-            className="text-[10px] uppercase font-bold tracking-widest text-slate-500 bg-slate-900/50 px-2 py-1 rounded border border-slate-700"
+            className="text-[10px] uppercase font-bold tracking-widest text-zinc-600 bg-zinc-900/80 px-2 py-1 rounded border border-zinc-800"
             title="Acesso administrativo não disponível para este perfil"
           >
             Acesso Limitado
@@ -81,50 +98,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
         </div>
       )}
 
-      <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${canManageUsers(user) ? 'bg-cyan-400' : 'bg-slate-500'}`} />
+      <h3 className="text-[10px] font-bold text-zinc-500 mb-4 flex items-center gap-2 uppercase tracking-[0.2em]">
+        <span className={`w-1.5 h-1.5 rounded-full ${canManageUsers(user) ? 'bg-amber-500' : 'bg-zinc-600'}`} />
         Painel Operacional
       </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+
         <button
           onClick={() => void handleAction('RELATORIO', onGenerateReport)}
           disabled={isLoading}
-          className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 text-white font-semibold rounded-md hover:bg-cyan-700 transition-colors shadow-lg shadow-cyan-900/20 w-full', 'RELATORIO')}
+          className={btn(hasPermission('RELATORIO'))}
         >
-          <DocumentReportIcon className="w-5 h-5" />
+          <DocumentReportIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           {isLoading ? 'Gerando...' : 'Gerar Relatório'}
         </button>
 
         <button
           onClick={() => void handleAction('NORMAS', () => setShowHelpModal(true))}
-          className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 text-white font-semibold rounded-md hover:bg-cyan-700 transition-colors shadow-lg shadow-cyan-900/20 w-full', 'NORMAS')}
+          className={btn(hasPermission('NORMAS'))}
         >
-          <BookOpenIcon className="w-5 h-5" />
+          <BookOpenIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           Normas
         </button>
 
         <button
           onClick={() => void handleAction('GESTAO_USUARIOS', () => setShowUserModal(true))}
-          className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 text-white font-semibold rounded-md hover:bg-slate-600 border border-slate-600 transition-colors w-full', 'GESTAO_USUARIOS')}
+          className={btn(hasPermission('GESTAO_USUARIOS'))}
         >
-          <UsersIcon className={`w-5 h-5 ${canManageUsers(user) ? 'text-cyan-400' : 'text-slate-400'}`} />
+          <UsersIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           Gerenciar Usuários
         </button>
 
         <button
           onClick={() => void handleAction('GESTAO_FAQ', () => setShowFAQModal(true))}
-          className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-slate-700 text-white font-semibold rounded-md hover:bg-slate-600 border border-slate-600 transition-colors w-full', 'GESTAO_FAQ')}
+          className={btn(hasPermission('GESTAO_FAQ'))}
         >
-          <QuestionMarkCircleIcon className={`w-5 h-5 ${canManageStandards(user) ? 'text-cyan-400' : 'text-slate-400'}`} />
+          <QuestionMarkCircleIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           Gerir Normas
         </button>
 
         <button
           onClick={() => void handleAction('AUDITORIA', () => setShowAuditModal(true))}
-          className={getButtonStyle('flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/20 w-full', 'AUDITORIA')}
+          className={btn(hasPermission('AUDITORIA'))}
         >
-          <ClipboardListIcon className="w-5 h-5" />
+          <ClipboardListIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
           Logs de Auditoria
         </button>
       </div>
