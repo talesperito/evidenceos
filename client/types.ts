@@ -46,7 +46,7 @@ export interface Vestige {
   id: string;
   material: string;
   requisicao: string;
-  involucro: string;
+  involucros: string[];
   fav: string;
   municipio: string;
   data: string;

@@ -10,6 +10,14 @@ const VALID_ESTADO_CONSERVACAO = [
 
 const VALID_DESTINACAO = ['NAO_INICIADO', 'SOLICITADO', 'FINALIZADO'];
 
+// Normaliza a lista de invólucros: remove espaços, descarta vazios e elimina
+// duplicatas dentro do MESMO vestígio (a checagem entre vestígios é feita à parte).
+const normalizeInvolucros = (arr?: string[] | null): string[] => {
+  if (!arr) return [];
+  const cleaned = arr.map((s) => s.trim()).filter((s) => s.length > 0);
+  return Array.from(new Set(cleaned));
+};
+
 export async function vestigeRoutes(server: FastifyInstance) {
   const querySchema = z.object({
     page: z.string().optional().transform(v => Number(v) || 1),
@@ -30,7 +38,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         { material: { contains: search, mode: 'insensitive' } },
         { registroFav: { contains: search, mode: 'insensitive' } },
         { requisicao: { contains: search, mode: 'insensitive' } },
-        { involucro: { contains: search, mode: 'insensitive' } },
+        { involucros: { some: { numero: { contains: search, mode: 'insensitive' } } } },
       ];
     }
     return where;
@@ -65,7 +73,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { category: true },
+        include: { category: true, involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' } } },
       }),
       prisma.vestige.count({ where }),
     ]);
@@ -92,7 +100,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: { category: true },
+        include: { category: true, involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' } } },
       }),
       prisma.vestige.count({ where }),
     ]);
@@ -110,26 +118,34 @@ export async function vestigeRoutes(server: FastifyInstance) {
 
   server.get('/check-duplicate', async (request) => {
     const schema = z.object({
-      involucro: z.string().optional(),
+      // Aceita um único valor (?involucro=X) ou repetido (?involucro=X&involucro=Y).
+      involucro: z.union([z.string(), z.array(z.string())]).optional(),
       requisicao: z.string().optional(),
       excludeId: z.string().optional(), // ID do vestígio atual em caso de edição
     });
 
-    const { involucro, requisicao, excludeId } = schema.parse(request.query);
+    const parsed = schema.parse(request.query);
+    const involucros = normalizeInvolucros(
+      Array.isArray(parsed.involucro) ? parsed.involucro : parsed.involucro ? [parsed.involucro] : [],
+    );
+    const { requisicao, excludeId } = parsed;
 
     const duplicates: { field: string; value: string; vestigeId: string; material: string; registroFav: string | null }[] = [];
 
-    if (involucro && involucro.trim() !== '') {
-      const found = await prisma.vestige.findFirst({
+    // Verifica cada número de invólucro contra todos os vestígios não excluídos.
+    for (const numero of involucros) {
+      const found = await prisma.vestigeInvolucro.findFirst({
         where: {
-          involucro,
-          deletedAt: null,
-          ...(excludeId ? { NOT: { id: excludeId } } : {}),
+          numero,
+          vestige: {
+            deletedAt: null,
+            ...(excludeId ? { NOT: { id: excludeId } } : {}),
+          },
         },
-        select: { id: true, material: true, registroFav: true },
+        select: { vestige: { select: { id: true, material: true, registroFav: true } } },
       });
       if (found) {
-        duplicates.push({ field: 'involucro', value: involucro, vestigeId: found.id, material: found.material, registroFav: found.registroFav });
+        duplicates.push({ field: 'involucro', value: numero, vestigeId: found.vestige.id, material: found.vestige.material, registroFav: found.vestige.registroFav });
       }
     }
 
@@ -174,7 +190,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         id,
         deletedAt: null,
       },
-      include: { category: true },
+      include: { category: true, involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' } } },
     });
 
     if (!vestige) {
@@ -201,7 +217,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       categoryId: z.number(),
       registroFav: z.string().optional(),
       requisicao: z.string().optional(),
-      involucro: z.string().optional(),
+      involucros: z.array(z.string()).optional(),
       municipio: z.string().default('Lavras'),
       dataColeta: z.string().optional().transform(v => v ? new Date(v) : null),
       observacoes: z.string().optional(),
@@ -209,14 +225,19 @@ export async function vestigeRoutes(server: FastifyInstance) {
       destinacao: z.enum(VALID_DESTINACAO as [string, ...string[]]).default('NAO_INICIADO'),
     });
 
-    const data = vestigeSchema.parse(request.body);
+    const { involucros: rawInvolucros, ...data } = vestigeSchema.parse(request.body);
+    const involucros = normalizeInvolucros(rawInvolucros);
     const user = request.user as any;
 
     const vestige = await prisma.vestige.create({
       data: {
         ...data,
         createdBy: user.id,
+        involucros: involucros.length > 0
+          ? { create: involucros.map((numero) => ({ numero })) }
+          : undefined,
       },
+      include: { involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' } } },
     });
 
     await auditService.log({
@@ -226,7 +247,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       action: 'CREATE',
       targetType: 'vestige',
       targetId: vestige.id,
-      details: data,
+      details: { ...data, involucros },
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
     });
@@ -243,7 +264,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       categoryId: z.number().optional(),
       registroFav: z.string().optional(),
       requisicao: z.string().optional(),
-      involucro: z.string().optional(),
+      involucros: z.array(z.string()).optional(),
       municipio: z.string().optional(),
       dataColeta: z.string().optional().transform(v => v ? new Date(v) : null),
       observacoes: z.string().optional(),
@@ -252,7 +273,9 @@ export async function vestigeRoutes(server: FastifyInstance) {
       destinacaoObs: z.string().optional(),
     });
 
-    const data = updateSchema.parse(request.body);
+    const { involucros: rawInvolucros, ...data } = updateSchema.parse(request.body);
+    const involucrosProvided = rawInvolucros !== undefined;
+    const involucros = normalizeInvolucros(rawInvolucros);
 
     if (data.destinacao) {
       const current = await prisma.vestige.findUnique({
@@ -281,7 +304,12 @@ export async function vestigeRoutes(server: FastifyInstance) {
       data: {
         ...data,
         updatedBy: user.id,
+        // Substitui o conjunto de invólucros apenas quando o cliente envia a lista.
+        ...(involucrosProvided
+          ? { involucros: { deleteMany: {}, create: involucros.map((numero) => ({ numero })) } }
+          : {}),
       },
+      include: { involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' } } },
     });
 
     await auditService.log({
@@ -291,7 +319,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
       action: 'UPDATE',
       targetType: 'vestige',
       targetId: vestige.id,
-      details: data,
+      details: { ...data, ...(involucrosProvided ? { involucros } : {}) },
       ipAddress: request.ip,
       userAgent: request.headers['user-agent'],
     });

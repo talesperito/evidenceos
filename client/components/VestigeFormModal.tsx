@@ -18,7 +18,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
   const [formData, setFormData] = useState<Partial<Vestige>>({
     material: '',
     requisicao: '',
-    involucro: '',
+    involucros: [''],
     fav: '',
     municipio: 'Lavras',
     data: new Date().toLocaleDateString('pt-BR'),
@@ -35,12 +35,40 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      // Garante ao menos um campo de invólucro em branco para edição (UX).
+      setFormData({
+        ...initialData,
+        involucros: initialData.involucros && initialData.involucros.length > 0
+          ? initialData.involucros
+          : [''],
+      });
     }
   }, [initialData]);
 
   const handleChange = (field: keyof Vestige, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // === Invólucros (lista dinâmica, sem limite de quantidade) ===
+  const handleInvolucroChange = (index: number, value: string) => {
+    const numericValue = value.replace(/\D/g, ''); // somente dígitos
+    setFormData(prev => {
+      const arr = [...(prev.involucros || [''])];
+      arr[index] = numericValue;
+      return { ...prev, involucros: arr };
+    });
+  };
+
+  const addInvolucro = () => {
+    setFormData(prev => ({ ...prev, involucros: [...(prev.involucros || []), ''] }));
+  };
+
+  const removeInvolucro = (index: number) => {
+    setFormData(prev => {
+      const arr = [...(prev.involucros || [])];
+      arr.splice(index, 1);
+      return { ...prev, involucros: arr.length > 0 ? arr : [''] };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,13 +77,13 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
     // Preflight: verificar duplicatas (apenas se não houve confirmação prévia)
     if (!pendingSubmit) {
-      const involucro = formData.involucro?.trim();
+      const involucros = (formData.involucros || []).map(s => s.trim()).filter(Boolean);
       const requisicao = formData.requisicao?.trim();
       const excludeId = initialData?.id;
 
-      if (involucro || requisicao) {
+      if (involucros.length > 0 || requisicao) {
         try {
-          const alerts = await checkDuplicate(involucro, requisicao, excludeId);
+          const alerts = await checkDuplicate(involucros, requisicao, excludeId);
           if (alerts.length > 0) {
             setDuplicateAlerts(alerts);
             setPendingSubmit(true);
@@ -158,17 +186,41 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                 />
                 <p className="text-[10px] text-slate-500 mt-1">Não inclua o ano (ex: 2024) no início do número.</p>
              </div>
-            <div>
-               <label className="block text-xs font-semibold text-slate-400 mb-1">NÚMERO DO INVÓLUCRO</label>
-               <input
-                 type="text"
-                 value={formData.involucro}
-                 onChange={e => handleNumericInput('involucro', e.target.value)}
-                 pattern="\d*"
-                 className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
-                 placeholder="Ex: 123456 (Apenas números)"
-                 title="Digite apenas os números do invólucro"
-               />
+            <div className="md:col-span-2">
+               <label className="block text-xs font-semibold text-slate-400 mb-1">NÚMERO(S) DO INVÓLUCRO</label>
+               <div className="space-y-2">
+                 {(formData.involucros || ['']).map((inv, index) => (
+                   <div key={index} className="flex items-center gap-2">
+                     <input
+                       type="text"
+                       value={inv}
+                       onChange={e => handleInvolucroChange(index, e.target.value)}
+                       pattern="\d*"
+                       inputMode="numeric"
+                       className="flex-grow bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
+                       placeholder="Ex: 123456 (Apenas números)"
+                       title="Digite apenas os números do invólucro"
+                     />
+                     {(formData.involucros?.length || 0) > 1 && (
+                       <button
+                         type="button"
+                         onClick={() => removeInvolucro(index)}
+                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded transition-colors shrink-0"
+                         title="Remover este invólucro"
+                       >
+                         <XIcon className="w-4 h-4" />
+                       </button>
+                     )}
+                   </div>
+                 ))}
+               </div>
+               <button
+                 type="button"
+                 onClick={addInvolucro}
+                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+               >
+                 <span className="text-base leading-none">+</span> Inserir novo invólucro
+               </button>
             </div>
 
             {/* Linha 3 */}

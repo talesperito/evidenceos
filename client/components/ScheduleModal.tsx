@@ -104,7 +104,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({ vestiges, onClose }) => {
       return `---
 MATERIAL: ${v.material}
 FAV: ${v.fav}
-REQUISIÇÃO: ${v.requisicao} | INVÓLUCRO: ${v.involucro}
+REQUISIÇÃO: ${v.requisicao} | INVÓLUCRO(S): ${v.involucros.join(', ') || 'N/I'}
 MOTIVO DA SAÍDA: ${finalReason}`;
     }).join('\n');
 
@@ -188,7 +188,7 @@ Gerado pelo Sistema de Controle de Vestígios URC Lavras`;
                                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" title="Motivo pendente"></span>
                                 )}
                             </div>
-                            <p className="text-xs text-zinc-500 font-mono mt-0.5">FAV: {v.fav} | Inv: {v.involucro}</p>
+                            <p className="text-xs text-zinc-500 font-mono mt-0.5">FAV: {v.fav} | Inv: {v.involucros.join(', ') || 'N/I'}</p>
                         </div>
                         
                         <div className="flex flex-col gap-2 w-full sm:w-auto shrink-0">

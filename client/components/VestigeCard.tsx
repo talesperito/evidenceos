@@ -110,8 +110,20 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
           <p className="font-medium text-white text-sm sm:text-base font-mono">{vestige.requisicao || 'N/A'}</p>
         </div>
         <div>
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Invólucro</p>
-          <p className="font-medium text-white text-sm sm:text-base font-mono">{vestige.involucro}</p>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
+            {vestige.involucros.length > 1 ? 'Invólucros' : 'Invólucro'}
+          </p>
+          {vestige.involucros.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {vestige.involucros.map((inv, idx) => (
+                <span key={idx} className="font-medium text-white text-xs sm:text-sm font-mono bg-slate-700/60 rounded px-1.5 py-0.5">
+                  {inv}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="font-medium text-white text-sm sm:text-base font-mono">N/A</p>
+          )}
         </div>
         <div>
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">FAV</p>

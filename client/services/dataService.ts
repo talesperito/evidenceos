@@ -11,7 +11,7 @@ interface ApiVestige {
   categoryId: number;
   registroFav?: string | null;
   requisicao?: string | null;
-  involucro?: string | null;
+  involucros?: { numero: string }[] | null;
   material: string;
   municipio: string;
   dataColeta?: string | null;
@@ -45,7 +45,7 @@ const mapVestige = (item: ApiVestige): Vestige => ({
   categoryId: item.categoryId,
   material: item.material,
   requisicao: item.requisicao || '',
-  involucro: item.involucro || '',
+  involucros: (item.involucros || []).map((i) => i.numero),
   fav: item.registroFav || '',
   municipio: item.municipio || 'Lavras',
   data: formatDate(item.dataColeta),
@@ -82,7 +82,7 @@ const buildPayload = async (vestige: Partial<Vestige>) => ({
   categoryId: await resolveCategoryId(vestige),
   registroFav: vestige.fav || undefined,
   requisicao: vestige.requisicao || undefined,
-  involucro: vestige.involucro || undefined,
+  involucros: (vestige.involucros || []).map((s) => s.trim()).filter((s) => s.length > 0),
   municipio: vestige.municipio || 'Lavras',
   dataColeta: parseDate(vestige.data),
   observacoes: vestige.observacoes || undefined,
@@ -153,12 +153,15 @@ export interface DuplicateAlert {
 }
 
 export const checkDuplicate = async (
-  involucro?: string,
+  involucros?: string[],
   requisicao?: string,
   excludeId?: string,
 ): Promise<DuplicateAlert[]> => {
   const params = new URLSearchParams();
-  if (involucro) params.append('involucro', involucro);
+  (involucros || [])
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .forEach((numero) => params.append('involucro', numero));
   if (requisicao) params.append('requisicao', requisicao);
   if (excludeId) params.append('excludeId', excludeId);
 

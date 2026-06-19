@@ -95,19 +95,23 @@ export const useVestiges = () => {
             matchesTerm =
               normalize(vestige.fav) === searchTerm ||
               normalize(vestige.requisicao) === searchTerm ||
-              normalize(vestige.involucro) === searchTerm ||
+              vestige.involucros.some((i) => normalize(i) === searchTerm) ||
               normalize(vestige.material).includes(searchTerm);
           } else {
             matchesTerm =
               normalize(vestige.fav).includes(searchTerm) ||
               normalize(vestige.requisicao).includes(searchTerm) ||
-              normalize(vestige.involucro).includes(searchTerm) ||
+              vestige.involucros.some((i) => normalize(i).includes(searchTerm)) ||
               normalize(vestige.material).includes(searchTerm) ||
               normalize(vestige.municipio).includes(searchTerm);
           }
+        } else if (filters.field === 'involucro') {
+          matchesTerm = isNumericSearch
+            ? vestige.involucros.some((i) => normalize(i) === searchTerm)
+            : vestige.involucros.some((i) => normalize(i).includes(searchTerm));
         } else {
           const fieldValue = normalize(vestige[filters.field as keyof Vestige] as string);
-          if (isNumericSearch && ['fav', 'requisicao', 'involucro'].includes(filters.field)) {
+          if (isNumericSearch && ['fav', 'requisicao'].includes(filters.field)) {
             matchesTerm = fieldValue === searchTerm;
           } else {
             matchesTerm = fieldValue.includes(searchTerm);
