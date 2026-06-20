@@ -12,6 +12,7 @@ export default defineConfig({
     host: '0.0.0.0',
     allowedHosts: [
       'evidenceos-web.2bwwuq.easypanel.host',
+      'evidenceos.investigacaoforense.com',
     ],
   },
 })
