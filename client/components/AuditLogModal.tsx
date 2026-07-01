@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getAuditExportUrl, getLogs } from '../services/auditService';
 import { AuditLog } from '../types';
 import { XIcon } from './icons/XIcon';
@@ -29,7 +30,7 @@ const AuditLogModal: React.FC<AuditLogModalProps> = ({ onClose }) => {
 
   const formatDate = (isoString: string) => new Date(isoString).toLocaleString('pt-BR');
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col border border-slate-700">
         <div className="flex justify-between items-center p-6 border-b border-slate-700 bg-slate-800/50 rounded-t-xl">
@@ -99,7 +100,8 @@ const AuditLogModal: React.FC<AuditLogModalProps> = ({ onClose }) => {
           </a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

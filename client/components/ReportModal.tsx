@@ -1,5 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ReportData, CategoryStats } from '../types';
 import { XIcon } from './icons/XIcon';
 import { PrinterIcon } from './icons/PrinterIcon';
@@ -75,7 +76,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
     });
   }, [reportData.byCategory, showCriticalOnly]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200 fixed-backdrop no-print-backdrop">
       <div
         id="report-modal-container"
@@ -328,7 +329,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { deleteUser, getUsers, saveUser } from '../services/userService';
 import { AuthorizedUser, User, UserRole, getRoleLabel } from '../types';
 import { XIcon } from './icons/XIcon';
@@ -94,7 +95,7 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-700 flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-5 border-b border-slate-700 bg-slate-800/50 rounded-t-xl">
@@ -221,7 +222,8 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
