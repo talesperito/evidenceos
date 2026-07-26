@@ -1,7 +1,7 @@
 # Plano de Integração com o PCNET
 
 **Data:** 2026-07-24
-**Status (atualizado em 2026-07-25):** 🏁 **PLANO CONCLUÍDO.** ETAPAS 0, 1, 2, 3, 5, 6 e 7 ✅ · ETAPA 4 ⛔ descartada (UI.Vision não foi necessário). Os 2 botões ("Ver FAV" e "Movimentar FAV") estão implementados, testados localmente pelo usuário e com auditoria verificada no banco. Commitado e enviado para a `main` em 2026-07-25. **Ressalva registrada:** o cenário de sessão PCNET expirada (ETAPA 7, item 1) não chegou a ser testado — ver nota da ETAPA 7. **Pendência de implantação:** a migration `20260724_0001_add_pcnet_action_log` precisa ser aplicada na VPS com `npx prisma migrate deploy` (o auto-deploy não roda migrations).
+**Status (atualizado em 2026-07-25):** 🏁 **PLANO CONCLUÍDO.** ETAPAS 0, 1, 2, 3, 5, 6 e 7 ✅ · ETAPA 4 ⛔ descartada (UI.Vision não foi necessário). Os 2 botões ("Ver FAV" e "Movimentar FAV") estão implementados, testados localmente pelo usuário e com auditoria verificada no banco. Commitado (`b45a71f`), enviado para a `main` e **implantado em produção em 2026-07-25**, com o funcionamento confirmado pelo registro de auditoria real (ver seção "Implantação em produção" no fim deste documento). **Todos os cenários previstos foram testados**, inclusive o de sessão do PCNET expirada — nada ficou como suposição. Ver os achados na nota da ETAPA 7.
 **Escopo original:** mapeamento do que já existe hoje na consulta de vestígio + estrutura do plano de integração + mapeamento da tela "Movimentação FAV" do PCNET + plano de execução passo a passo (Parte 4)
 
 > ## 📍 Para o agente que for executar este plano
@@ -558,24 +558,52 @@ Isso elimina a necessidade de extensão de navegador **para as 3 ações** (não
 
 ### ETAPA 7 — Validação final e fechamento
 
-**Status:** ✅ Encerrada em 2026-07-25 por decisão do usuário ("vamos fechar o plano") — item 2 ✅ verificado; **item 1 (sessão expirada) NÃO foi testado**, ver nota de retomada
+**Status:** ✅ Concluída em 2026-07-25 — **todos os itens testados**, inclusive o cenário de sessão expirada, validado em produção
 **Depende de:** ETAPAS 3 e 6 concluídas e testadas ✅.
 
 **O que fazer:**
-1. ⬜ **Pendente (só o usuário pode fazer — exige deslogar da sessão real dele no PCNET).** Testar o cenário de sessão do PCNET expirada: abrir um dos botões (Ver FAV / Movimentar FAV) com o PCNET deslogado em todas as abas, e confirmar que a tela de login do próprio PCNET aparece normalmente na aba aberta pelo EvidenceOS (não é um erro do EvidenceOS tratar — é o comportamento nativo esperado, ver ETAPA 4/6).
+1. ✅ **Testado em produção em 2026-07-25 (o usuário desconectou do PCNET de propósito).** Confirmado o comportamento esperado: o clique em "Ver FAV" abriu a nova aba com **a tela de login do próprio PCNET**, sem nenhuma mensagem de erro do EvidenceOS — que é o correto, já que o EvidenceOS não tem como saber o que carregou na outra origem. Dois achados adicionais registrados abaixo. Item original: testar o cenário de sessão do PCNET expirada: abrir um dos botões (Ver FAV / Movimentar FAV) com o PCNET deslogado em todas as abas, e confirmar que a tela de login do próprio PCNET aparece normalmente na aba aberta pelo EvidenceOS (não é um erro do EvidenceOS tratar — é o comportamento nativo esperado, ver ETAPA 4/6).
 2. ✅ **Verificado em 2026-07-25 (banco de dev, consulta de leitura via Prisma).** `PcnetActionLog` e `AuditLog` estão registrando corretamente. Resultado: **9 linhas em `PcnetActionLog` e 9 correspondentes em `AuditLog`**, pareando uma a uma — 3 `MOVIMENTAR` (FAVs 1789050, 1833323, 1833328, 1881014) gerados pelo teste da ETAPA 6, mais os `VIEW_FAV` da ETAPA 3. Todos com `status: 'SOLICITADO'`, `pcnetIdentifier` igual à FAV do vestígio, usuário correto, e o `AuditLog` geral com `action: 'PCNET_VIEW_FAV'`/`'PCNET_MOVIMENTAR'` e `targetType: 'vestige'`. **Nenhum registro faltando nem duplicado** — confirma que o `logPcnetAction` do frontend está de fato chegando ao banco, o que não era observável pela UI (por decisão da ETAPA 3, falha de auditoria não gera erro visível).
    - *Nota para quem for repetir essa consulta:* o Prisma 7 deste projeto **exige o adapter explícito** (`PrismaPg` + `Pool`, ver `server/src/db/connection.ts`); um `new PrismaClient()` sem argumentos falha com `PrismaClientInitializationError`.
 3. Atualizar o `**Status:**` no topo deste documento para refletir o que foi implementado e o que ficou de fora (ex.: se algum dia fizer sentido diferenciar Recebimento/Transporte no log, isso ficaria pra uma iteração futura — ver ETAPA 6 sobre a limitação assumida conscientemente).
 
 **Critério de conclusão:** os 2 botões (Ver FAV, Movimentar FAV) funcionando em produção, com auditoria própria confirmada.
 
-**Nota de retomada:** ✅ Plano encerrado em 2026-07-25, com uma ressalva registrada de propósito:
+**Nota de retomada:** ✅ Plano encerrado em 2026-07-25 com **todos os itens verificados**, nenhum deixado como suposição.
 
-**O item 1 (sessão do PCNET expirada) nunca chegou a ser testado.** O usuário optou por fechar o plano sem executá-lo. Não é um risco relevante — o comportamento esperado é simplesmente o PCNET exibir sua própria tela de login na aba aberta, que é o que já acontece hoje quando ele navega manualmente, e o EvidenceOS não tem nenhum código tratando esse caso (por decisão da ETAPA 4/6). Mas fica registrado que **é uma suposição, não uma verificação**.
+**Achados do teste de sessão expirada (executado em produção, 2026-07-25):**
 
-Itens 2 e 3 concluídos. Os dois botões foram testados localmente pelo usuário e a auditoria foi conferida no banco.
+1. **Comportamento confirmado:** com o PCNET desconectado, o clique em "Ver FAV" abre a nova aba na tela de login do próprio PCNET. O EvidenceOS não exibe (nem tem como exibir) mensagem de erro — a aba é de outra origem e a política de mesma origem do navegador impede ler seu conteúdo. Detectar isso exigiria a Opção B da seção 3.4 (backend falando com o PCNET usando a sessão do usuário), **rejeitada por decisão de não guardar credencial/cookie do PCNET**. A ausência de mensagem é, portanto, uma consequência aceita dessa decisão, não uma lacuna a corrigir.
+2. **Após o login, o PCNET redireciona para `inicial.do` (tela inicial), descartando a URL da FAV pretendida.** O usuário precisa voltar ao EvidenceOS e clicar no botão de novo — o que funcionou na segunda tentativa. Vale considerar, numa iteração futura de UX, ajustar a nota do card para algo como "se a sessão do PCNET tiver caído, faça login e clique novamente".
+3. **A limitação de auditoria foi observada na prática, não só documentada.** As três linhas `PCNET_VIEW_FAV` geradas no teste (23:50:36, 23:55:32 e 23:57:37, todas da FAV 1833328) são **indistinguíveis entre si**, embora a primeira tenha resultado apenas na tela de login e a última tenha de fato aberto a FAV. Confirma na prática que o log prova **que a tela foi solicitada, nunca que a FAV foi vista** — reforçando que, para conciliar o que realmente aconteceu com um vestígio, a fonte de verdade continua sendo o PCNET.
+
+Itens 2 e 3 também concluídos. Os dois botões foram testados localmente e em produção, e a auditoria foi conferida tanto no banco de dev quanto no painel de produção.
 
 **Achado colateral, fora do escopo deste plano (não corrigido):** durante a validação, apareceu no Firefox o aviso "O Firefox impediu este site de abrir uma janela ou aba". **Não são os botões do PCNET** — o usuário confirmou que ambos abrem de primeira, sem precisar liberar popup. O candidato provável é código pré-existente em `client/components/SearchResults.tsx:49-63` (`handlePrint`): no caminho "imprimir apenas os selecionados", há um `setTimeout(() => window.print(), 300)` depois de um `window.confirm()` — o atraso faz o Firefox perder a ativação do clique do usuário e bloquear o preview de impressão. O caminho "imprimir todos" (linha 62, `window.print()` direto) não sofre disso. **Não foi reproduzido nem corrigido** — fica como candidato a um ajuste futuro, junto com a sugestão de blindar `window.open` nos botões do PCNET (checar o retorno `null` antes de gravar o log, evitando registrar `SOLICITADO` para uma aba que não abriu — hoje isso não ocorre na prática, mas o código não verifica).
+
+---
+
+## Implantação em produção (2026-07-25)
+
+Commit `b45a71f` enviado para a `main`. A implantação desta feature exigiu **os dois serviços de aplicação** do Easypanel, porque o commit tocou `server/` e `client/` — cada serviço tem build e botão "Implantar" próprios, e o push na `main` não implanta os dois de uma vez.
+
+| Serviço | O que precisou | Status |
+|---|---|---|
+| **api** | Deploy + aplicar a migration manualmente | ✅ Feito. Confirmado no console do serviço `api`: `cd /app && npx prisma@7.7.0 migrate deploy` → `Applying migration 20260724_0001_add_pcnet_action_log` → `All migrations have been successfully applied.` (banco `evidenceos_prod`). O comando encontrou as 4 migrations, o que também **prova que o container do `api` já estava com o código do commit novo**. |
+| **web** | Deploy (o frontend é compilado no build e servido como estático pelo nginx) | ✅ Feito em 2026-07-25. Confirmado: os botões passaram a aparecer no card em `evidenceos.investigacaoforense.com`. |
+| **db** | Nada | — |
+
+**Armadilha que ocorreu de verdade, registrada para não repetir:** logo após o deploy do `api` + migration, os botões **não apareceram em produção**. A causa foi ter reimplantado só o `api`: o `web` continuava servindo o bundle JavaScript antigo, compilado antes desta feature existir. Não houve erro nenhum na tela — a funcionalidade simplesmente não estava lá. Depois do deploy do `web` é preciso ainda dar **`Ctrl+Shift+R`**, porque o nginx serve estático com cache e um F5 comum pode continuar entregando o bundle velho.
+
+**Detalhe do comando da migration:** o pacote `prisma` (CLI) é `devDependency`, então pode não existir na imagem de produção — por isso o `npx prisma@7.7.0`, com a versão fixada para casar com o `@prisma/client` do projeto. Sem fixar, o `npx` baixaria a versão mais recente, que pode divergir.
+
+**Verificação que fecha o ciclo — ✅ executada e aprovada em 2026-07-25:** clicar em "Ver FAV" em produção e confirmar que aparece uma linha `PCNET_VIEW_FAV` em Logs de Auditoria. É o único teste que prova que a gravação funciona — por decisão da ETAPA 3, uma falha ao registrar o log **não gera erro visível na tela**, então "o botão abriu a aba" não prova que a auditoria está funcionando.
+
+Resultado obtido: `25/07/2026, 23:50:36 | PCNET_VIEW_FAV | {"status":"SOLICITADO","registroFav":"1833328",...}` no ambiente de produção. Isso valida de uma vez os três elos da implantação: o `web` serviu o bundle novo (o botão existe e é clicável), o `api` está com a rota viva, e a migration foi aplicada (sem a tabela `pcnet_action_logs` a rota teria falhado e nenhuma linha apareceria).
+
+**🏁 Integração 100% implantada e verificada em produção.**
+
+*(Esta orientação de deploy foi replicada no `CLAUDE.md` do projeto, na seção "Infraestrutura & Deploy", para valer em qualquer implantação futura — não só nesta feature. O `CLAUDE.md` é local e não versionado.)*
 
 ---
 

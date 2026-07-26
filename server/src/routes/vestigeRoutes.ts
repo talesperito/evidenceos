@@ -8,7 +8,10 @@ const VALID_ESTADO_CONSERVACAO = [
   'USADO_FUNCIONANDO', 'DANIFICADO', 'SEM_CONDICOES'
 ];
 
-const VALID_DESTINACAO = ['NAO_INICIADO', 'SOLICITADO', 'FINALIZADO'];
+// NAO_INICIADO = na URC · RETIRADO = saiu da URC (detalhe fica na FAV do PCNET).
+// SOLICITADO e FINALIZADO saíram do seletor da UI, mas continuam aceitos aqui:
+// registros gravados antes da simplificação precisam poder ser salvos de novo.
+const VALID_DESTINACAO = ['NAO_INICIADO', 'RETIRADO', 'SOLICITADO', 'FINALIZADO'];
 
 // Normaliza a lista de invólucros: remove espaços, descarta vazios e elimina
 // duplicatas dentro do MESMO vestígio (a checagem entre vestígios é feita à parte).

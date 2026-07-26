@@ -285,7 +285,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">DESTINAÇÃO</label>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">SITUAÇÃO</label>
               <select
                 required
                 value={formData.destinacao}
@@ -298,22 +298,18 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
               </select>
             </div>
 
-            {/* Campo condicional de observação da destinação */}
-            {(formData.destinacao === 'SOLICITADO' || formData.destinacao === 'FINALIZADO') && (
+            {/* Observação opcional — só faz sentido quando o vestígio saiu da URC.
+                Não é obrigatória: o registro oficial de quem retirou está na FAV do PCNET. */}
+            {formData.destinacao !== 'NAO_INICIADO' && (
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
-                  {formData.destinacao === 'SOLICITADO'
-                    ? 'OBSERVAÇÃO DA SOLICITAÇÃO (Quem solicitou e motivo)'
-                    : 'DADOS DA FINALIZAÇÃO'}
+                  OBSERVAÇÃO <span className="font-normal text-slate-500">(opcional — o detalhe oficial está na FAV)</span>
                 </label>
                 <textarea
-                  required
                   value={formData.destinacaoObs || ''}
                   onChange={e => handleChange('destinacaoObs' as keyof Vestige, e.target.value)}
                   className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none h-20 resize-none"
-                  placeholder={formData.destinacao === 'SOLICITADO'
-                    ? 'Ex: Solicitado por Del. João Silva - Ofício 123/2026 - Restituição ao proprietário'
-                    : 'Ex: Entregue ao requisitante em 15/04/2026 - Protocolo 456/2026'}
+                  placeholder="Ex: retirado para incineração"
                 />
               </div>
             )}

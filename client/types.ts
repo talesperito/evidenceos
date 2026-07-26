@@ -133,13 +133,28 @@ export const getEstadoConservacaoLabel = (value: string): string =>
   ESTADO_CONSERVACAO_OPTIONS.find(o => o.value === value)?.label || value;
 
 // === Destinação ===
+// Duas situações apenas, de propósito: o que importa na listagem é saber se o vestígio
+// ainda está fisicamente na URC. O detalhe de quem retirou, quando e para quê já fica
+// registrado na FAV do PCNET — não faz sentido duplicar isso aqui.
 export const DESTINACAO_OPTIONS = [
-  { value: 'NAO_INICIADO', label: 'Não iniciado' },
-  { value: 'SOLICITADO', label: 'Solicitado' },
-  { value: 'FINALIZADO', label: 'Finalizado' },
+  { value: 'NAO_INICIADO', label: 'Na URC' },
+  { value: 'RETIRADO', label: 'Retirado (ver FAV)' },
 ] as const;
 
 export type Destinacao = typeof DESTINACAO_OPTIONS[number]['value'];
 
+// Valores antigos, fora do seletor mas ainda exibíveis: registros gravados antes desta
+// simplificação continuam existindo no banco e precisam de rótulo legível.
+const DESTINACAO_LEGADO: Record<string, string> = {
+  SOLICITADO: 'Solicitado (legado)',
+  FINALIZADO: 'Finalizado (legado)',
+};
+
 export const getDestinacaoLabel = (value: string): string =>
-  DESTINACAO_OPTIONS.find(o => o.value === value)?.label || value;
+  DESTINACAO_OPTIONS.find(o => o.value === value)?.label
+  || DESTINACAO_LEGADO[value]
+  || value;
+
+// Vestígio que não está mais fisicamente na URC. Usado para o alerta visual do card.
+export const estaForaDaUrc = (destinacao: string): boolean =>
+  destinacao === 'RETIRADO' || destinacao === 'FINALIZADO';

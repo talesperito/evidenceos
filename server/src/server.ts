@@ -20,6 +20,11 @@ const server = fastify({
 server.register(cors, {
   origin: true,
   credentials: true,
+  // O @fastify/cors usa por padrão apenas 'GET,HEAD,POST'. Sem declarar os demais verbos,
+  // o preflight de PUT/DELETE é recusado pelo navegador e a requisição nunca chega aqui.
+  // Em produção isso não aparecia (web e api são o mesmo domínio, logo não há preflight),
+  // mas em dev (localhost:5173 → localhost:3000) quebrava toda edição e exclusão.
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 });
 
 server.register(jwt, {

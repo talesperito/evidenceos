@@ -186,7 +186,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Destinação</label>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-1.5">Situação</label>
                 <select
                   value={destinacao}
                   onChange={(e) => setDestinacao(e.target.value)}

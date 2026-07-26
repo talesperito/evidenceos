@@ -141,7 +141,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       await logAction(user, 'CREATE', `Criação de vestígio FAV ${formData.fav || ''}`.trim());
     }
 
-    await refreshData();
+    const atualizados = await refreshData();
+
+    // A lista de selecionados também é um array próprio e sofria da mesma defasagem:
+    // sem isto, um vestígio editado continuaria exibindo o valor antigo na tela de seleção.
+    setSelectedVestiges((previous) =>
+      previous.map((item) => atualizados.find((fresh) => fresh.id === item.id) ?? item),
+    );
   };
 
   const displayedVestiges = isViewingSelection ? selectedVestiges : filteredVestiges;

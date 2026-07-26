@@ -62,6 +62,14 @@ export const useVestiges = () => {
         getCategories(),
       ]);
       setVestiges(data);
+      // Os resultados de busca são um array próprio (`filteredVestiges`). Sem atualizá-lo aqui,
+      // recarregar os dados após uma edição deixava o card exibindo a versão antiga do vestígio
+      // — a alteração ia para o banco, mas a tela continuava mostrando o valor anterior.
+      // Trocamos item a item pela versão nova, preservando a lista e a ordem do resultado atual;
+      // um item que deixe de casar com o filtro continua visível em vez de sumir sob os olhos.
+      setFilteredVestiges((previous) =>
+        previous.map((item) => data.find((fresh) => fresh.id === item.id) ?? item),
+      );
       setCategories(loadedCategories.map((category) => category.name));
       return data;
     } catch (err) {

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Vestige, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel } from '../types';
+import { Vestige, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel, estaForaDaUrc } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -59,6 +59,9 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
     // Integração PCNET: só é possível consultar a FAV se o vestígio tiver esse número registrado.
     const hasFav = Boolean(vestige.fav && vestige.fav.trim());
 
+    // Vestígio que não está mais fisicamente na URC — precisa saltar aos olhos na listagem.
+    const foraDaUrc = estaForaDaUrc(vestige.destinacao);
+
     // Abre a FAV no PCNET em outra aba. O EvidenceOS não autentica no PCNET — depende da sessão
     // que o usuário já tem aberta lá. Se não estiver logado, o próprio PCNET exibe sua tela de login.
     const handleVerFav = () => {
@@ -94,12 +97,27 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
 
 
   return (
-    <div className={`group rounded-xl p-5 transition-all duration-300 relative border ${
-        isSelected 
-        ? 'bg-amber-900/10 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]' 
+    <div className={`group rounded-xl p-5 transition-all duration-300 relative border overflow-hidden ${
+        isSelected
+        ? 'bg-amber-900/10 border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]'
         : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.07]'
     }`}>
-      
+
+      {/* Faixa lateral + aviso: o vestígio não está mais fisicamente na URC.
+          Marcamos só estes dois pontos (mais o badge de Situação) em vez de tingir o card
+          inteiro: sair da URC é o processo funcionando, não um erro, e com o tempo será a
+          situação da maioria dos vestígios — vermelho em tudo deixaria de destacar qualquer coisa. */}
+      {foraDaUrc && (
+        <>
+          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500" aria-hidden="true" />
+          <div className="flex items-center gap-2 mb-3 text-red-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <span className="text-xs font-bold uppercase tracking-wider">Não está na URC</span>
+            <span className="text-[10px] text-red-400/70 normal-case font-normal">— consulte a FAV para saber quem retirou</span>
+          </div>
+        </>
+      )}
+
       {/* Badge de Selecionado (Feedback Visual) */}
       {isSelected && (
           <div className="absolute -top-3 -right-2 bg-amber-500 text-black text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 animate-in zoom-in duration-200 z-10 tracking-wider">
@@ -196,13 +214,13 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
           </span>
         </div>
 
-        {/* Destinação */}
+        {/* Situação física do vestígio. Vermelho = saiu da URC (ver estaForaDaUrc). */}
         <div>
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Destinação</p>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Situação</p>
           <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
-            vestige.destinacao === 'NAO_INICIADO' ? 'bg-zinc-700 text-zinc-300' :
+            foraDaUrc ? 'bg-red-500/20 text-red-400 ring-1 ring-red-500/40' :
             vestige.destinacao === 'SOLICITADO' ? 'bg-yellow-500/20 text-yellow-400' :
-            'bg-green-500/20 text-green-400'
+            'bg-zinc-700 text-zinc-300'
           }`}>
             {getDestinacaoLabel(vestige.destinacao)}
           </span>
