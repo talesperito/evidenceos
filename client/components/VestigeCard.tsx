@@ -4,7 +4,9 @@ import { Vestige, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLa
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
+import { DocumentReportIcon } from './icons/DocumentReportIcon';
 import ScheduleModal from './ScheduleModal';
+import { buildPcnetUrl, logPcnetAction } from '../services/dataService';
 
 interface VestigeCardProps {
   vestige: Vestige;
@@ -53,7 +55,44 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
     const custodyTime = useMemo(() => calculateCustodyTime(vestige.data), [vestige.data]);
     const canEdit = user ? canEditVestige(user) : false;
     const canDelete = user ? canDeleteVestige(user) : false;
-    
+
+    // Integração PCNET: só é possível consultar a FAV se o vestígio tiver esse número registrado.
+    const hasFav = Boolean(vestige.fav && vestige.fav.trim());
+
+    // Abre a FAV no PCNET em outra aba. O EvidenceOS não autentica no PCNET — depende da sessão
+    // que o usuário já tem aberta lá. Se não estiver logado, o próprio PCNET exibe sua tela de login.
+    const handleVerFav = () => {
+        if (!hasFav) return;
+        window.open(buildPcnetUrl('VIEW_FAV', vestige.fav), '_blank', 'noopener,noreferrer');
+        // Registra a solicitação para auditoria. Não bloqueia nem desfaz a abertura da aba se falhar,
+        // por isso o erro é apenas logado no console.
+        logPcnetAction(vestige.id, 'VIEW_FAV', vestige.fav).catch((error) => {
+            console.error('Falha ao registrar consulta ao PCNET na auditoria:', error);
+        });
+    };
+
+    // Abre a tela "Sob Custódia" do PCNET já carregada com esta FAV. O EvidenceOS não preenche nem
+    // salva nada: quem escolhe a Finalidade e clica em "Salvar" é sempre o usuário, dentro do PCNET.
+    // Por isso o aviso abaixo é obrigatório — a gravação lá é oficial e irreversível, e o número da
+    // FAV é exibido para o usuário conferir que é o vestígio certo antes de a aba abrir.
+    const handleMovimentarFav = () => {
+        if (!hasFav) return;
+
+        const confirmado = window.confirm(
+            `Isso vai abrir a tela de movimentação no PCNET para a FAV ${vestige.fav}.\n\n` +
+            'A movimentação só é gravada de fato se você escolher a Finalidade e clicar em Salvar lá dentro.'
+        );
+        if (!confirmado) return;
+
+        window.open(buildPcnetUrl('MOVIMENTAR', vestige.fav), '_blank', 'noopener,noreferrer');
+        // Mesma regra do "Ver FAV": o log registra que a tela foi aberta, nunca que algo foi gravado —
+        // o EvidenceOS não tem retorno do PCNET. Falha de auditoria não desfaz a abertura da aba.
+        logPcnetAction(vestige.id, 'MOVIMENTAR', vestige.fav).catch((error) => {
+            console.error('Falha ao registrar movimentação no PCNET na auditoria:', error);
+        });
+    };
+
+
   return (
     <div className={`group rounded-xl p-5 transition-all duration-300 relative border ${
         isSelected 
@@ -176,11 +215,39 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
       </div>
       
       {/* Actions Area */}
-      <div className="mt-5 pt-4 border-t border-white/5 flex flex-col sm:flex-row justify-end gap-3">
-        
+      <div className="mt-5 pt-4 border-t border-white/5 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
+
+        {/* Ação PCNET: abre a FAV oficial (leitura). O asterisco remete à nota de pré-requisito abaixo. */}
+        <button
+            onClick={handleVerFav}
+            disabled={!hasFav}
+            title={hasFav
+                ? 'Abre a Ficha de Acompanhamento de Vestígio no PCNET, em outra aba. É necessário estar logado no PCNET.'
+                : 'Este vestígio não possui número de FAV registrado.'}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs bg-transparent hover:bg-white/5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-zinc-700"
+        >
+            <DocumentReportIcon className="w-4 h-4 text-zinc-400"/>
+            Ver FAV
+            <span className="text-amber-500/70" aria-hidden="true">*</span>
+        </button>
+
+        {/* Ação PCNET: abre a tela de movimentação (escrita feita pelo usuário dentro do PCNET). */}
+        <button
+            onClick={handleMovimentarFav}
+            disabled={!hasFav}
+            title={hasFav
+                ? 'Abre a tela de movimentação desta FAV no PCNET, em outra aba. A gravação é feita por você, dentro do PCNET. É necessário estar logado no PCNET.'
+                : 'Este vestígio não possui número de FAV registrado.'}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs bg-transparent hover:bg-white/5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-zinc-700"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            Movimentar FAV
+            <span className="text-amber-500/70" aria-hidden="true">*</span>
+        </button>
+
         {/* Botão de Agendamento Individual */}
-        <button 
-            onClick={() => setShowScheduleModal(true)} 
+        <button
+            onClick={() => setShowScheduleModal(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 text-xs bg-transparent hover:bg-white/5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 font-medium py-2 px-4 rounded-lg transition-colors"
         >
             <CalendarIcon className="w-4 h-4 text-zinc-400"/>
@@ -211,6 +278,13 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
             </button>
         )}
       </div>
+
+      {/* Nota de pré-requisito: vale só para os botões marcados com * (ações que abrem o PCNET) */}
+      {hasFav && (
+        <p className="mt-2 text-[10px] text-zinc-500 text-right leading-tight">
+            <span className="text-amber-500/70" aria-hidden="true">*</span> Requer login no PCNET em outra aba
+        </p>
+      )}
 
       {showScheduleModal && (
         <ScheduleModal 

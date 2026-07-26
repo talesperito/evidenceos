@@ -27,6 +27,7 @@ model User {
   destinationChanges  VestigeDestinationLog[]
   changedDestinations Vestige[]               @relation("DestinationChangedBy")
   passwordResetTokens PasswordResetToken[]
+  pcnetActionLogs     PcnetActionLog[]
 
   @@map("users")
   @@schema("public")
@@ -84,6 +85,7 @@ model Vestige {
   destinationLogs    VestigeDestinationLog[]
   destinationChanger User?                   @relation("DestinationChangedBy", fields: [destinacaoChangedBy], references: [id])
   involucros         VestigeInvolucro[]
+  pcnetActionLogs    PcnetActionLog[]
 
   @@map("vestiges")
   @@schema("public")
@@ -118,6 +120,24 @@ model VestigeDestinationLog {
   user        User     @relation(fields: [changedBy], references: [id])
 
   @@map("vestige_destination_logs")
+  @@schema("public")
+}
+
+model PcnetActionLog {
+  id              BigInt   @id @default(autoincrement())
+  vestigeId       String   @map("vestige_id")
+  action          String   // VIEW_FAV, MOVIMENTAR
+  status          String   @default("SOLICITADO") // SOLICITADO — o EvidenceOS só abre a tela do PCNET, não confirma se o usuário salvou algo lá
+  pcnetIdentifier String   @map("pcnet_identifier") // registroFav usado na URL, para rastreabilidade
+  requestedBy     String   @map("requested_by")
+  requestedAt     DateTime @default(now()) @map("requested_at")
+
+  // Relations
+  vestige         Vestige  @relation(fields: [vestigeId], references: [id])
+  user            User     @relation(fields: [requestedBy], references: [id])
+
+  @@index([vestigeId])
+  @@map("pcnet_action_logs")
   @@schema("public")
 }
 

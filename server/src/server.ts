@@ -10,6 +10,7 @@ import { categoryRoutes } from './routes/categoryRoutes';
 import { userRoutes } from './routes/userRoutes';
 import { auditRoutes } from './routes/auditRoutes';
 import { custodyStandardRoutes } from './routes/custodyStandardRoutes';
+import { pcnetRoutes } from './routes/pcnetRoutes';
 
 const server = fastify({
   logger: true,
@@ -32,6 +33,7 @@ server.register(cookie);
 // Registro de Rotas
 server.register(authRoutes, { prefix: '/api/auth' });
 server.register(vestigeRoutes, { prefix: '/api/vestiges' });
+server.register(pcnetRoutes, { prefix: '/api/vestiges' });
 server.register(categoryRoutes, { prefix: '/api/categories' });
 server.register(userRoutes, { prefix: '/api/admin/users' });
 server.register(auditRoutes, { prefix: '/api/audit' });

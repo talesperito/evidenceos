@@ -144,6 +144,33 @@ export const fetchDestinationHistory = async (vestigeId: string): Promise<Destin
   return apiRequest<DestinationLogEntry[]>(`/api/vestiges/${vestigeId}/destination-history`);
 };
 
+// --- Integração PCNET ---
+// Ver docs/plans/2026-07-24-integracao-pcnet.md.
+// O EvidenceOS apenas abre a tela correspondente do PCNET em outra aba, reaproveitando a sessão
+// que o usuário já tem aberta lá. Não autentica, não preenche e não salva nada no PCNET — por isso
+// o registro abaixo é sempre "SOLICITADO": sabemos que a tela foi aberta, não o que o usuário fez nela.
+export type PcnetAction = 'VIEW_FAV' | 'MOVIMENTAR';
+
+const PCNET_BASE_URL = 'https://www.pcnet.mg.gov.br/PCnet';
+
+export const buildPcnetUrl = (action: PcnetAction, fav: string): string => {
+  const identifier = encodeURIComponent(fav.trim());
+  return action === 'VIEW_FAV'
+    ? `${PCNET_BASE_URL}/cadeiacustodiasel.do?evento=gerarFav&idMaterial=${identifier}`
+    : `${PCNET_BASE_URL}/sobcustodiaman.do?evento=x&idMaterialCustodiado=${identifier}`;
+};
+
+export const logPcnetAction = async (
+  vestigeId: string,
+  action: PcnetAction,
+  pcnetIdentifier: string,
+): Promise<void> => {
+  await apiRequest(`/api/vestiges/${vestigeId}/pcnet-actions`, {
+    method: 'POST',
+    body: JSON.stringify({ action, status: 'SOLICITADO', pcnetIdentifier }),
+  });
+};
+
 export interface DuplicateAlert {
   field: 'involucro' | 'requisicao';
   value: string;
