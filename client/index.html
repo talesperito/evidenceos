@@ -52,6 +52,14 @@
           visibility: hidden;
         }
 
+        /* #root fica só invisível (visibility:hidden), mas continua no fluxo do
+           documento com a altura real do app por trás do modal — isso empurrava
+           todo o conteúdo do relatório para a página 2+ do PDF, deixando a
+           página 1 em branco. Precisa de display:none para colapsar o espaço. */
+        #root {
+          display: none !important;
+        }
+
         #report-modal-container,
         #report-modal-container * {
           visibility: visible;
