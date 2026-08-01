@@ -5,9 +5,9 @@ const API_BASE_URL = (env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/
 let accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
 let refreshPromise: Promise<void> | null = null;
 
-const buildHeaders = (headers?: HeadersInit): Headers => {
+const buildHeaders = (headers?: HeadersInit, hasBody?: boolean): Headers => {
   const merged = new Headers(headers);
-  if (!merged.has('Content-Type')) {
+  if (hasBody && !merged.has('Content-Type')) {
     merged.set('Content-Type', 'application/json');
   }
   if (accessToken) {
@@ -66,7 +66,7 @@ export const apiRequest = async <T>(path: string, init: RequestInit = {}, allowR
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     credentials: 'include',
-    headers: buildHeaders(init.headers),
+    headers: buildHeaders(init.headers, init.body !== undefined),
   });
 
   if (response.status === 401 && allowRetry && path !== '/api/auth/refresh' && path !== '/api/auth/login') {

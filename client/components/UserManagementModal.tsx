@@ -143,13 +143,15 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
 
           <div className="bg-slate-800/50 p-5 rounded-lg border border-slate-700">
             <h3 className="text-sm font-semibold text-cyan-400 uppercase tracking-wider mb-4">Novo Cadastro</h3>
-            <form onSubmit={handleAddUser} className="space-y-4">
+            <form onSubmit={handleAddUser} className="space-y-4" autoComplete="off">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">Nome Completo</label>
                   <input
                     type="text"
+                    name="new-user-name"
                     required
+                    autoComplete="off"
                     value={newUser.name}
                     onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
@@ -159,7 +161,9 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                   <label className="block text-xs text-slate-400 mb-1">E-mail</label>
                   <input
                     type="email"
+                    name="new-user-email"
                     required
+                    autoComplete="off"
                     value={newUser.email}
                     onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                     className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
@@ -170,7 +174,9 @@ const UserManagementModal: React.FC<UserManagementModalProps> = ({ user, onClose
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
+                      name="new-user-password"
                       required
+                      autoComplete="new-password"
                       value={newUser.password}
                       onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                       className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 pr-10 text-white text-sm focus:border-cyan-500 outline-none"
