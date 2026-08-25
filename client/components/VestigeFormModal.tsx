@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vestige, ESTADO_CONSERVACAO_OPTIONS, DESTINACAO_OPTIONS } from '../types';
+import { Vestige, User, ESTADO_CONSERVACAO_OPTIONS, DESTINACAO_OPTIONS } from '../types';
 import { XIcon } from './icons/XIcon';
 import { checkDuplicate, DuplicateAlert } from '../services/dataService';
+import ConfirmEditModal, { computeVestigeChanges, FieldChange } from './ConfirmEditModal';
 
 interface VestigeFormModalProps {
   initialData?: Vestige | null;
@@ -12,9 +13,11 @@ interface VestigeFormModalProps {
     municipios: string[];
     origins: string[];
   };
+  /** Apenas para exibir na confirmação quem vai assinar a alteração na auditoria. */
+  user?: User;
 }
 
-const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClose, onSave, options }) => {
+const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClose, onSave, options, user }) => {
   const [formData, setFormData] = useState<Partial<Vestige>>({
     material: '',
     requisicao: '',
@@ -32,6 +35,9 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
   const [error, setError] = useState<string | null>(null);
   const [duplicateAlerts, setDuplicateAlerts] = useState<DuplicateAlert[]>([]);
   const [pendingSubmit, setPendingSubmit] = useState(false);
+  // Confirmação obrigatória da edição (ver requestSave). Só existe quando há initialData.
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<FieldChange[]>([]);
 
   useEffect(() => {
     if (initialData) {
@@ -47,6 +53,14 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
   const handleChange = (field: keyof Vestige, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // A categoria é resolvida pelo nome (planilhaOrigem) no envio, mas só quando o payload não
+  // traz categoryId — e na edição ele vem preenchido com o valor antigo. Limpamos o id ao
+  // trocar a categoria para que a troca chegue de fato ao servidor: sem isto, o formulário
+  // exibia (e a confirmação anunciaria) a categoria nova enquanto o banco mantinha a antiga.
+  const handleCategoryChange = (value: string) => {
+    setFormData(prev => ({ ...prev, planilhaOrigem: value, categoryId: undefined }));
   };
 
   // === Invólucros (lista dinâmica, sem limite de quantidade) ===
@@ -71,8 +85,37 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     });
   };
 
+  // Grava de fato. Só é chamada depois de o usuário confirmar, quando se trata de edição.
+  const performSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      onClose();
+    } catch (err: any) {
+      // O erro precisa ficar visível no formulário, não atrás da confirmação.
+      setShowEditConfirm(false);
+      setError(err.message);
+      setIsSaving(false);
+    }
+  };
+
+  // Alterar um vestígio já cadastrado mexe na cadeia de custódia e fica registrado na
+  // auditoria em nome de quem salvou: exige confirmação explícita do que será gravado.
+  // Cadastro novo não passa por aqui — não há registro anterior para alterar sem querer.
+  const requestSave = async () => {
+    if (initialData) {
+      setPendingChanges(computeVestigeChanges(initialData, formData));
+      setShowEditConfirm(true);
+      return;
+    }
+    await performSave();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Com a confirmação aberta, um Enter vindo do formulário atrás dela não pode
+    // reabrir o fluxo nem disparar um segundo salvamento.
+    if (showEditConfirm || isSaving) return;
     setError(null);
 
     // Preflight: verificar duplicatas (apenas se não houve confirmação prévia)
@@ -95,30 +138,24 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
       }
     }
 
-    setIsSaving(true);
-    try {
-      await onSave(formData);
-      onClose();
-    } catch (err: any) {
-      setError(err.message);
-      setIsSaving(false);
-    }
+    await requestSave();
   };
 
   const handleConfirmDespiteAlert = async () => {
     setDuplicateAlerts([]);
-    setIsSaving(true);
-    try {
-      await onSave(formData);
-      onClose();
-    } catch (err: any) {
-      setError(err.message);
-      setIsSaving(false);
-    }
+    await requestSave();
   };
 
   const handleCancelDuplicate = () => {
     setDuplicateAlerts([]);
+    setPendingSubmit(false);
+  };
+
+  const handleCancelEditConfirm = () => {
+    setShowEditConfirm(false);
+    setPendingChanges([]);
+    // Volta ao ponto de partida do fluxo: se o usuário mexer nos dados de novo, a checagem
+    // de duplicata roda outra vez em vez de ser pulada pela confirmação anterior.
     setPendingSubmit(false);
   };
 
@@ -263,7 +300,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                <select
                  required
                  value={formData.planilhaOrigem}
-                 onChange={e => handleChange('planilhaOrigem', e.target.value)}
+                 onChange={e => handleCategoryChange(e.target.value)}
                  className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none appearance-none"
                >
                  {options.origins.map(o => <option key={o} value={o}>{o}</option>)}
@@ -389,6 +426,18 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
           </div>
         </form>
       </div>
+
+      {/* Trava de intenção: nenhuma edição chega ao servidor sem passar por aqui. */}
+      {showEditConfirm && initialData && (
+        <ConfirmEditModal
+          vestige={initialData}
+          changes={pendingChanges}
+          user={user}
+          isSaving={isSaving}
+          onConfirm={() => void performSave()}
+          onCancel={handleCancelEditConfirm}
+        />
+      )}
     </div>
   );
 };

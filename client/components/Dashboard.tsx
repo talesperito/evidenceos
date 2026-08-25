@@ -276,6 +276,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           onClose={() => setShowFormModal(false)}
           onSave={handleSaveForm}
           options={availableOptions}
+          user={user}
         />
       )}
 
