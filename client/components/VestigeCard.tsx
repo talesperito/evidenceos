@@ -112,8 +112,8 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
           <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-red-500" aria-hidden="true" />
           <div className="flex items-center gap-2 mb-3 text-red-400">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-            <span className="text-xs font-bold uppercase tracking-wider">Não está na URC</span>
-            <span className="text-[10px] text-red-400/70 normal-case font-normal">— consulte a FAV para saber quem retirou</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Material não se encontra a URC</span>
+            <span className="text-[10px] text-red-400/70 uppercase font-normal">— consulte a FAV</span>
           </div>
         </>
       )}
