@@ -1,8 +1,11 @@
 # Plano: Reimportação/Sincronização da Planilha do Google para o Banco da VPS
 
-**Data:** 2026-07-26
-**Status:** 🔍 Levantamento concluído · ✅ **Decisões de desenho tomadas pelo usuário em 2026-07-26** (ver Parte 3) · ⬜ Nada implementado ainda — nenhum script alterado, nenhuma sincronização executada.
-**Escopo deste documento:** Parte 1 (como funciona hoje) · Parte 2 (o que impede rodar de novo) · Parte 3 (decisões tomadas) · Parte 4 (abordagens possíveis) · Parte 5 (plano de execução proposto)
+**Data:** 2026-07-26 · **Última atualização:** 2026-09-10
+**Status:** 🏁 **PRIMEIRA SINCRONIZAÇÃO EXECUTADA EM PRODUÇÃO em 2026-09-10.** Levantamento concluído · Decisões tomadas (Parte 3) · Pipeline implementado no commit `63fa1f6` · Execução real registrada na **Parte 6**.
+**Escopo deste documento:** Parte 1 (como funciona hoje) · Parte 2 (o que impede rodar de novo) · Parte 3 (decisões tomadas) · Parte 4 (abordagens possíveis) · Parte 5 (plano de execução) · **Parte 6 (execução real de 2026-09-10 + pendências)**
+
+> ## 📍 Para quem retomar este documento
+> As Partes 1 a 5 são o levantamento e o desenho, de julho. **O que aconteceu de fato está na Parte 6**, no fim — inclusive os números reais, os procedimentos operacionais que só se descobrem rodando, e as **3 pendências que ainda bloqueiam o "marco inicial"**.
 
 > ## ⛔ Antes de qualquer coisa: NÃO rode `npm run phase2:run` (nem `phase2:seed`) no estado atual
 >
@@ -278,4 +281,126 @@ Isso contraria a política de segredos do `CLAUDE.md` ("credenciais sempre em `.
 2. Se estiver aberta, restringir e mover a URL para variável de ambiente.
 3. Considerar que essa URL já esteve exposta no histórico do Git — remover do código atual **não** a apaga dos commits antigos.
 
-*Levantamento apenas. Nada foi executado, nenhum script foi rodado contra banco nenhum, e nenhum código foi alterado.*
+---
+
+# Parte 6 — Execução real em produção (2026-09-10)
+
+## 6.1 Regra de negócio que passou a valer
+
+Decisão do usuário, tomada em 2026-09-10 e que **substitui a discussão da Parte 3 sobre a coluna `situação`**:
+
+> **Vale o que está na planilha.** Até o "marco inicial", a planilha do Drive é a fonte de verdade absoluta. Os colaboradores ainda **não criam nem editam vestígios no SaaS** — isso só começa depois do marco. Tudo que está na VPS e não está na planilha é descartável.
+
+Consequência: a coluna `situação` deixou de ser necessária **nesta fase**. A regra "está na VPS e não está no Drive → excluir (logicamente)" foi aprovada como correta.
+
+Durante a conferência, 6 registros com aparência legítima (FAVs `1697263`, `1523781`, `1862367`, `1041993`, `1498634`, `1340520`) e 5 outros vindos da importação de abril (`809320`, `809314`, `809288`, `809229`, `1393608`) foram levantados como possivelmente reais. **O usuário conferiu no acervo físico e confirmou que todos foram excluídos permanentemente ou são inventados.** Decisão registrada — não reabrir.
+
+## 6.2 Números da operação
+
+| Momento | Drive | VPS (ativos) |
+|---|---|---|
+| Importação original (abril) | 4.600 | 4.600 |
+| Dry-run de 2026-07-26 | 5.064 | 4.602 |
+| **Dry-run de 2026-09-10 (antes)** | **5.267** | **4.611** |
+| **Depois da sincronização** | 5.267 | **5.216** |
+
+Aplicado em duas passadas:
+
+| | 1ª passada (`--sem-exclusoes`) | 2ª passada |
+|---|---|---|
+| Inseridos | **627** | 0 |
+| Invólucros atualizados | **12** | 0 |
+| Excluídos logicamente | 0 | **12** |
+
+Mais **10 registros excluídos à mão pelo usuário** na tela do EvidenceOS, antes da sincronização: os 9 bloqueados pela trava de "trabalho feito" (conservação preenchida, destinação ou ações PCNET) mais 1 extra. A trava **não foi flexibilizada** — a decisão foi limpar pela UI, que também é exclusão lógica e também é auditada.
+
+Ficaram fora da sincronização automática **429 linhas** do Drive com FAV repetida (214 FAVs), das quais 36 eram linhas novas que **nunca foram inseridas**. Exigem decisão manual e o script nunca as resolve sozinho.
+
+## 6.3 Procedimento operacional (o que só se aprende rodando)
+
+**Onde rodar.** O container do serviço `api` tem o `server/` como raiz: o caminho é **`/app`**, não `/app/server`. Os scripts ficam em `/app/scripts/`.
+
+**Onde os relatórios caem.** `_phase2-common.cjs` calcula `ROOT_DIR = path.resolve(__dirname, '..', '..')`. Localmente isso dá `evidenceos/database`; **dentro do container dá `/database`** (raiz do filesystem). É lá que ficam `sheets-snapshot-latest.json` e `sync-dryrun-report.json`.
+
+**O download demora ~35 s e o script não imprime nada nesse intervalo** — parece travado, não está. Ver pendência 6.4.1.
+
+**Sempre usar `--offline` no apply**, para que ele trabalhe exatamente sobre o snapshot que o usuário aprovou no dry-run, sem risco de a planilha mudar no meio.
+
+**Backup antes do apply.** O agendador de backup do Easypanel (serviço `db` → "Cópias de segurança") **exige um provedor de armazenamento S3 configurado**, que não existe hoje — e é agendamento por cron, não backup imediato. O caminho que funciona é `pg_dump` no console do serviço **`db`**:
+
+```bash
+pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc \
+  -f /var/lib/postgresql/data/backup-antes-sync-$(date +%F-%H%M).dump \
+  && ls -lh /var/lib/postgresql/data/backup-antes-sync-*.dump
+```
+
+Sai em `/var/lib/postgresql/data/`, que é volume persistente. Conferir que o arquivo abre antes de confiar nele:
+
+```bash
+pg_restore --list <arquivo>.dump | grep -i "TABLE DATA"
+```
+
+Deve listar 11 tabelas, incluindo `vestiges`, `vestige_involucros` e `audit_logs`. O backup de 2026-09-10 ficou com 430 KB.
+
+**Esta operação não passa por git nem por deploy.** Ela muda dados, não código nem estrutura. Não confundir com migration: aquela sim vai por push → deploy do `api` → `migrate deploy` à mão. Se os scripts de sincronização forem alterados, aí o `api` precisa de deploy **antes** de rodar o comando no console.
+
+## 6.4 Pendências — as 3 primeiras bloqueiam o "marco inicial"
+
+### 🔴 6.4.1 `importedFrom` marca todo vestígio criado na tela como se viesse da planilha
+
+`schema.prisma` define `importedFrom String @default("google_sheets")` e **as rotas de criação nunca preenchem esse campo** (não há uma única menção a `importedFrom` em `vestigeRoutes.ts`).
+
+Efeito: o "Grupo B — criados manualmente" **nunca terá ninguém**. Todo vestígio digitado no sistema cai no Grupo A e é tratado como resíduo de teste.
+
+**Por que bloqueia o marco inicial:** depois da virada, os vestígios criados pela equipe não estarão na planilha — por definição. Na primeira sincronização seguinte eles seriam marcados como excluídos, e a trava de "trabalho feito" não os salvaria, porque um vestígio recém-criado ainda não tem conservação nem destinação preenchida. **Corrigir antes do marco.**
+
+### 🔴 6.4.2 Duplicatas dentro do banco são invisíveis
+
+`analisar()` reduz o banco a um `Set` de FAVs. Dois vestígios com a mesma FAV casam ambos com a mesma linha da planilha: nenhum aparece em relatório algum, nenhum é excluído, e uma eventual troca de invólucro é aplicada nos dois. Não há constraint de unicidade em `legacyId` nem em `registroFav`.
+
+Comprovado em produção: a FAV `3001234` existia **três vezes** no banco. Só foi detectada porque nenhuma delas estava na planilha.
+
+### 🟡 6.4.3 O apply não atualiza campos, só o invólucro
+
+Correções feitas na planilha em `material`, `requisicao`, `municipio` ou `data` **nunca chegam ao banco**. Na prática o que existe é a Abordagem C da Parte 4, não a B completa. Relevante porque a planilha é editada diariamente: hoje há 528 linhas sem data (eram 375 em abril) e várias requisições com o literal `x`.
+
+### 🟡 6.4.4 `fetch` sem timeout
+
+`_sync-common.cjs` chama `fetch()` sem `AbortSignal.timeout()` e sem imprimir progresso. Se o Apps Script ficar indisponível, o script pendura indefinidamente em vez de falhar. Medido em 2026-09-10: 858 KB em 35 s.
+
+### ✅ 6.4.5 Backup automático — RESOLVIDO em 2026-09-10
+
+Até 2026-09-10 **nunca havia sido feito backup do banco**. Resolvido no mesmo dia.
+
+O agendador do Easypanel foi descartado: ele exige um provedor de armazenamento S3 (campo obrigatório) e não sabe gravar na própria VPS. Optou-se por manter o backup local, já que a VPS usa 10 GB de 400 GB e a Hostinger mantém snapshots da VM como segunda camada.
+
+**Solução implementada** — `/root/backup-evidenceos.sh`, no **host** da VPS (não em container):
+
+| | |
+|---|---|
+| Agendamento | `0 6 * * *` no crontab do root — 6h UTC = 3h de Brasília |
+| Destino | `/root/backups/evidenceos/` |
+| Retenção | 30 dias, rotação automática via `find -mtime` |
+| Log | `backup.log` (execuções) e `cron.log` (saída do cron) |
+| Tamanho | ~488 KB por dump |
+
+Dois detalhes de implementação que importam:
+
+1. **O container é descoberto pelo prefixo, nunca fixado.** O nome real (`evidenceos_db.1.2pwzu8n19zlvbboyicszisico`) carrega um sufixo do Docker Swarm que muda a cada redeploy — fixá-lo faria o backup parar silenciosamente.
+2. **O script valida o dump antes de aceitar**, conferindo via `pg_restore -l` que a tabela `vestiges` está presente. Se não estiver, sai com erro em vez de gravar `OK`. Backup que não abre não é backup.
+
+Roda no host, e não dentro do container, por dois motivos: o `docker exec` só existe no host, e um cron dentro do container do `db` sumiria no primeiro redeploy.
+
+**Ainda em aberto:** o backup vive na mesma máquina que o banco. Não protege contra perda total da VPS. Migrar para S3 (Cloudflare R2 ou Backblaze B2, ambos com 10 GB grátis) cobriria esse cenário e permitiria usar o agendador nativo do Easypanel.
+
+### 🟡 6.4.6 `APPS_SCRIPT_URL` ainda hardcoded
+
+Continua em `_phase2-common.cjs:10`, versionada no Git. Ver "Observação de segurança" acima — segue válida e não resolvida.
+
+## 6.5 Estado da planilha em 2026-09-10
+
+5.267 linhas · 5.043 FAVs distintas · 29 abas (as mesmas de abril) · 9 linhas sem FAV (com invólucro) · **0 linhas sem chave**.
+
+Estrutura: continua com as **7 colunas originais** (`material`, `requisicao`, `involucro`, `fav`, `municipio`, `data`, `planilhaOrigem`). **A coluna `situação` decidida na Parte 3 nunca foi criada no Apps Script.**
+
+Sujeira conhecida: 2 linhas com ano `202` e 1 com ano `2052` (digitação); 528 linhas sem data; uso do literal `x` como "não informado" em FAV, requisição e material — já normalizado pelo script.
