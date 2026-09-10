@@ -69,7 +69,11 @@ function imprimirRelatorios(a, snapshot, schema, items) {
   };
 
   imprimirGrupo(a.grupoA, 'GRUPO A — importados da planilha (candidatos a resíduo de teste)');
-  imprimirGrupo(a.grupoB, 'GRUPO B — criados manualmente no EvidenceOS (NÃO são resíduo de teste)');
+  imprimirGrupo(a.grupoB, 'GRUPO B — criados no EvidenceOS (NUNCA excluídos automaticamente)');
+  if (a.grupoB.length) {
+    console.log('\nCritério: sem data de importação (`importedAt`), logo não vieram da planilha.');
+    console.log('São trabalho da equipe. Só saem por decisão individual e explícita do usuário.');
+  }
 
   // ================= RELATÓRIO 3 =================
   titulo('RELATÓRIO 3 — Alerta: registros do Grupo A que já têm trabalho feito');
@@ -141,6 +145,7 @@ async function main() {
       material: v.material,
       categoria: v.category?.name,
       importedFrom: v.importedFrom,
+      importedAt: v.importedAt,
       estadoConservacao: v.estadoConservacao,
       destinacao: v.destinacao,
       involucros: v.involucros.map((i) => i.numero),

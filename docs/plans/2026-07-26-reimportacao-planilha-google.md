@@ -346,13 +346,30 @@ Deve listar 11 tabelas, incluindo `vestiges`, `vestige_involucros` e `audit_logs
 
 ## 6.4 Pendências — as 3 primeiras bloqueiam o "marco inicial"
 
-### 🔴 6.4.1 `importedFrom` marca todo vestígio criado na tela como se viesse da planilha
+### 🟢 6.4.1 `importedFrom` marca todo vestígio criado na tela como se viesse da planilha — MITIGADO em 2026-09-10
 
-`schema.prisma` define `importedFrom String @default("google_sheets")` e **as rotas de criação nunca preenchem esse campo** (não há uma única menção a `importedFrom` em `vestigeRoutes.ts`).
+**O defeito:** `schema.prisma:78` define `importedFrom String @default("google_sheets")` e **as rotas de criação nunca preenchem esse campo** (não há uma única menção a `importedFrom` em `vestigeRoutes.ts`).
 
-Efeito: o "Grupo B — criados manualmente" **nunca terá ninguém**. Todo vestígio digitado no sistema cai no Grupo A e é tratado como resíduo de teste.
+Efeito: o "Grupo B — criados manualmente" **nunca teria ninguém**. Todo vestígio digitado no sistema cairia no Grupo A e seria tratado como resíduo de teste. Depois do marco inicial, a primeira sincronização marcaria como excluído o trabalho da equipe — e a trava de "trabalho feito" não o salvaria, porque um vestígio recém-criado ainda não tem conservação nem destinação preenchida.
 
-**Por que bloqueia o marco inicial:** depois da virada, os vestígios criados pela equipe não estarão na planilha — por definição. Na primeira sincronização seguinte eles seriam marcados como excluídos, e a trava de "trabalho feito" não os salvaria, porque um vestígio recém-criado ainda não tem conservação nem destinação preenchida. **Corrigir antes do marco.**
+**A mitigação:** a classificação em `_sync-common.cjs` passou a exigir **dois sinais** para considerar que um vestígio veio da planilha:
+
+```js
+const veioDaPlanilha = (v) => v.importedFrom === 'google_sheets' && v.importedAt !== null;
+```
+
+`importedAt` é o sinal confiável porque depende de uma **ausência**: só quem passou por um script de importação o tem preenchido (`_phase2-common.cjs:125` e `sync-apply.cjs:131`); a rota de criação o deixa `NULL` e não há como preenchê-lo por engano. A conjunção é conservadora de propósito — na dúvida o vestígio cai no Grupo B e fica protegido.
+
+Escolheu-se mitigar no script em vez de corrigir a rota porque o script **não exige migration** nem altera o comportamento da API para quem está usando o sistema. Ambos exigem deploy do `api` (os scripts moram em `server/`), mas o do script é o de menor risco.
+
+Verificado com teste de lógica sobre dados sintéticos antes do deploy: um vestígio com `importedAt` nulo cai no Grupo B e fica fora de `excluiveis`.
+
+**O que ficou de dívida (🟡):** o campo `importedFrom` continua mentindo no banco — todo vestígio criado pela equipe é gravado como `google_sheets`. Não quebra mais a sincronização, mas envenena qualquer relatório, consulta ou tela futura que use esse campo para distinguir origem. A correção completa é:
+
+1. Em `vestigeRoutes.ts`, no `prisma.vestige.create`, passar `importedFrom: 'manual'` (mantendo o campo **fora** do schema Zod, para o cliente não poder forjá-lo).
+2. Trocar o default do schema para `"manual"` via migration (`ALTER TABLE vestiges ALTER COLUMN imported_from SET DEFAULT 'manual'`), de forma que o esquecimento futuro erre protegendo.
+
+Fazer no próximo deploy do `api` que houver por outro motivo. Lembrar da armadilha `P3014`: escrever o SQL à mão e aplicar com `migrate deploy`.
 
 ### 🔴 6.4.2 Duplicatas dentro do banco são invisíveis
 

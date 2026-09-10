@@ -100,6 +100,7 @@ async function carregarVestigios(prisma) {
       requisicao: true,
       material: true,
       importedFrom: true,
+      importedAt: true,
       estadoConservacao: true,
       destinacao: true,
       createdAt: true,
@@ -195,8 +196,23 @@ function analisar(items, vestiges) {
     }
   }
 
-  const grupoA = soNaVps.filter((v) => v.importedFrom === 'google_sheets');
-  const grupoB = soNaVps.filter((v) => v.importedFrom !== 'google_sheets');
+  // Veio mesmo da planilha? Exige os DOIS sinais.
+  //
+  // `importedFrom` sozinho não serve: o schema tem `@default("google_sheets")` e a rota
+  // de criação (vestigeRoutes.ts) não preenche o campo, então todo vestígio digitado na
+  // tela nasce marcado como se tivesse vindo da planilha. Usar só esse campo faria o
+  // Grupo B ficar sempre vazio e jogaria o trabalho da equipe na fila de exclusão.
+  //
+  // `importedAt` é o sinal confiável, porque depende de uma AUSÊNCIA: só quem passou por
+  // um script de importação o tem preenchido (_phase2-common.cjs e sync-apply.cjs); a
+  // rota de criação o deixa NULL e não há como preenchê-lo por engano.
+  //
+  // A conjunção é deliberadamente conservadora: na dúvida, o vestígio cai no Grupo B e
+  // fica protegido de exclusão automática. Errar protegendo é barato; o contrário não.
+  const veioDaPlanilha = (v) => v.importedFrom === 'google_sheets' && v.importedAt !== null;
+
+  const grupoA = soNaVps.filter(veioDaPlanilha);
+  const grupoB = soNaVps.filter((v) => !veioDaPlanilha(v));
 
   // Registros onde alguém já trabalhou dentro do EvidenceOS: não são resíduo inofensivo.
   const temTrabalho = (v) =>
