@@ -196,3 +196,76 @@ export const getMotivoLabel = (value: string): string =>
 
 export const numerosDe = (items?: VestigeItem[] | null): string[] =>
   (items || []).map((item) => item.numero);
+
+// === Solicitação de Retirada ===
+// Plano: docs/plans/2026-08-25-solicitacao-retirada.md. O banco guarda o `value` (código); a tela
+// mostra o `label`. Os `value` espelham VALID_REASONS em server/src/routes/withdrawalRoutes.ts —
+// mexeu aqui, mexa lá. Mesmo padrão de ESTADO_CONSERVACAO_OPTIONS e DESTINACAO_OPTIONS.
+export const WITHDRAWAL_REASONS = [
+  { value: 'DESTRUICAO', label: 'Destruição' },
+  { value: 'RESTITUICAO', label: 'Restituição' },
+  { value: 'ANALISE_INVESTIGACAO', label: 'Análise pela Investigação' },
+  { value: 'SOLICITACAO_JUDICIAL', label: 'Solicitação Judicial' },
+  { value: 'OUTROS', label: 'Outros' },
+] as const;
+
+export type WithdrawalReason = typeof WITHDRAWAL_REASONS[number]['value'];
+
+export const getWithdrawalReasonLabel = (value: string): string =>
+  WITHDRAWAL_REASONS.find((o) => o.value === value)?.label || value;
+
+export const WITHDRAWAL_STATUS_OPTIONS = [
+  { value: 'SOLICITADA', label: 'Agendada' },
+  { value: 'CONCLUIDA', label: 'Concluída' },
+  { value: 'CANCELADA', label: 'Cancelada' },
+  { value: 'NAO_COMPARECEU', label: 'Não compareceu' },
+] as const;
+
+export type WithdrawalStatus = typeof WITHDRAWAL_STATUS_OPTIONS[number]['value'];
+
+export const getWithdrawalStatusLabel = (value: string): string =>
+  WITHDRAWAL_STATUS_OPTIONS.find((o) => o.value === value)?.label || value;
+
+export interface WithdrawalRequestItem {
+  id: string;                  // BigInt do banco, já convertido para string pela API
+  vestigeId: string;
+  reason: string;              // CÓDIGO (ex.: 'ANALISE_INVESTIGACAO'). Exibir com getWithdrawalReasonLabel().
+  reasonDetail: string | null;
+  material: string | null;
+  fav: string;                 // ← vem de registroFav
+  // Só os NÚMEROS dos itens ativos. Atenção: aqui é string[], diferente de
+  // Vestige.requisicoes / Vestige.involucros, que são VestigeItem[] (número + motivo).
+  requisicoes: string[];
+  involucros: string[];
+  municipio: string | null;
+  destinacao: string | null;   // situação ATUAL do vestígio — o painel mostra quem já saiu da URC
+  vestigeDeleted: boolean;
+}
+
+export interface WithdrawalRequest {
+  id: string;
+  scheduledFor: string;        // ISO
+  status: string;
+  notes: string | null;
+  // Preenchido só quando um ADMIN agendou com menos de 24h: a solicitação furou o prazo.
+  deadlineOverrideReason: string | null;
+  requestedBy: string;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  requestedAt: string;
+  statusChangedByName: string | null;
+  statusChangedAt: string | null;
+  statusNote: string | null;
+  items: WithdrawalRequestItem[];
+}
+
+export interface OpenWithdrawalItem {
+  vestigeId: string;
+  requestId: string;
+  scheduledFor: string;
+  requesterName: string;
+}
+
+// Mudar status e registrar a retirada. Todos os perfis podem agendar e ver o painel.
+export const canManageWithdrawals = (user: Pick<User, 'role'>): boolean =>
+  user.role === 'ADMIN' || user.role === 'PERITO';

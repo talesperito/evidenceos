@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Vestige, User } from '../types';
+import { Vestige, User, OpenWithdrawalItem } from '../types';
 import VestigeCard from './VestigeCard';
 import { MagnifyingGlassIcon } from './icons/MagnifyingGlassIcon';
 import { PrinterIcon } from './icons/PrinterIcon';
@@ -25,9 +25,12 @@ interface SearchResultsProps {
   user?: User;
   onEdit?: (vestige: Vestige) => void;
   onDelete?: (vestige: Vestige) => void;
+  // Retiradas agendadas: só repassadas ao card (selo âmbar)
+  openWithdrawals?: Map<string, OpenWithdrawalItem>;
+  onWithdrawalCreated?: () => void;
 }
 
-const SearchResults: React.FC<SearchResultsProps> = ({ 
+const SearchResults: React.FC<SearchResultsProps> = ({
     vestiges, 
     loading, 
     totalVestiges, 
@@ -41,7 +44,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     onViewSelection,
     user,
     onEdit,
-    onDelete
+    onDelete,
+    openWithdrawals,
+    onWithdrawalCreated
 }) => {
 
   const selectedCount = Array.from(selectedIds).length;
@@ -188,6 +193,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             user={user}
             onEdit={onEdit}
             onDelete={onDelete}
+            withdrawal={openWithdrawals?.get(vestige.id)}
+            onWithdrawalCreated={onWithdrawalCreated}
           />
         </div>
       ))}

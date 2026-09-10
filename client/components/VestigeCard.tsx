@@ -1,12 +1,13 @@
 
 import React, { useState, useMemo } from 'react';
-import { Vestige, VestigeItem, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel, getMotivoLabel, estaForaDaUrc } from '../types';
+import { Vestige, VestigeItem, User, OpenWithdrawalItem, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel, getMotivoLabel, estaForaDaUrc } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
 import { DocumentReportIcon } from './icons/DocumentReportIcon';
 import ScheduleModal from './ScheduleModal';
 import { buildPcnetUrl, logPcnetAction } from '../services/dataService';
+import { formatScheduledShort } from '../services/withdrawalService';
 
 interface VestigeCardProps {
   vestige: Vestige;
@@ -15,6 +16,10 @@ interface VestigeCardProps {
   user?: User; // Passamos o user para verificar permissões de edição
   onEdit?: (vestige: Vestige) => void;
   onDelete?: (vestige: Vestige) => void;
+  /** Retirada agendada mais próxima deste vestígio, se houver (selo âmbar). */
+  withdrawal?: OpenWithdrawalItem;
+  /** Chamado quando uma solicitação é gravada pelo agendamento individual deste card. */
+  onWithdrawalCreated?: () => void;
 }
 
 // Invólucros/requisições: o número fica em destaque e o motivo da inclusão aparece ao passar
@@ -68,7 +73,9 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
     onToggleSelect, 
     user,
     onEdit,
-    onDelete
+    onDelete,
+    withdrawal,
+    onWithdrawalCreated
 }) => {
     const [showScheduleModal, setShowScheduleModal] = useState(false);
     const custodyTime = useMemo(() => calculateCustodyTime(vestige.data), [vestige.data]);
@@ -235,6 +242,17 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
           }`}>
             {getDestinacaoLabel(vestige.destinacao)}
           </span>
+          {/* Âmbar = retirada agendada, o material AINDA está na URC. O vermelho continua significando
+              só "fora da URC": se as duas coisas forem verdade ao mesmo tempo, os dois sinais aparecem. */}
+          {withdrawal && (
+            <span
+              className="mt-1 flex w-fit items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30"
+              title={`Solicitada por ${withdrawal.requesterName}`}
+            >
+              <CalendarIcon className="w-3 h-3" />
+              Retirada agendada — {formatScheduledShort(withdrawal.scheduledFor)}
+            </span>
+          )}
           {vestige.destinacaoObs && (
             <p className="text-[10px] text-zinc-400 mt-1 italic truncate max-w-[200px]" title={vestige.destinacaoObs}>
               {vestige.destinacaoObs}
@@ -316,9 +334,12 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
       )}
 
       {showScheduleModal && (
-        <ScheduleModal 
+        <ScheduleModal
             vestiges={[vestige]} // Passa array com 1 item
-            onClose={() => setShowScheduleModal(false)} 
+            onClose={() => setShowScheduleModal(false)}
+            onCreated={() => onWithdrawalCreated?.()}
+            openWithdrawals={withdrawal ? new Map([[vestige.id, withdrawal]]) : undefined}
+            user={user}
         />
       )}
     </div>

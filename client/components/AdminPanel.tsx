@@ -4,7 +4,9 @@ import { UsersIcon } from './icons/UsersIcon';
 import { ClipboardListIcon } from './icons/ClipboardListIcon';
 import { QuestionMarkCircleIcon } from './icons/QuestionMarkCircleIcon';
 import { BookOpenIcon } from './icons/BookOpenIcon';
+import { CalendarIcon } from './icons/CalendarIcon';
 import ReportModal from './ReportModal';
+import WithdrawalRequestsModal from './WithdrawalRequestsModal';
 import UserManagementModal from './UserManagementModal';
 import AuditLogModal from './AuditLogModal';
 import FAQManagementModal from './FAQManagementModal';
@@ -27,7 +29,8 @@ interface AdminPanelProps {
   isLoading: boolean;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportData, onCloseReport, isLoading }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ user, onRefresh, onGenerateReport, reportData, onCloseReport, isLoading }) => {
+  const [showWithdrawalsModal, setShowWithdrawalsModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showFAQModal, setShowFAQModal] = useState(false);
@@ -37,6 +40,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
     switch (action) {
       case 'RELATORIO':
       case 'NORMAS':
+        return true;
+      // Todos veem as retiradas — o VISUALIZADOR é quem agenda e precisa conferir o registro.
+      // Agir nelas (registrar, cancelar) é só ADMIN/PERITO, controle feito no modal e no servidor.
+      case 'RETIRADAS':
         return true;
       case 'GESTAO_USUARIOS':
         return user.role === 'ADMIN' || user.role === 'PERITO';
@@ -103,7 +110,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
         Painel Operacional
       </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+        <button
+          onClick={() => void handleAction('RETIRADAS', () => setShowWithdrawalsModal(true))}
+          className={btn(hasPermission('RETIRADAS'))}
+        >
+          <CalendarIcon className="w-5 h-5 transition-transform group-hover:scale-110" />
+          Retiradas Agendadas
+        </button>
 
         <button
           onClick={() => void handleAction('RELATORIO', onGenerateReport)}
@@ -147,6 +162,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ user, onGenerateReport, reportD
         </button>
       </div>
 
+      {showWithdrawalsModal && (
+        <WithdrawalRequestsModal user={user} onClose={() => setShowWithdrawalsModal(false)} onDataChanged={onRefresh} />
+      )}
       {reportData && <ReportModal reportData={reportData} onClose={onCloseReport} />}
       {showUserModal && <UserManagementModal user={user} onClose={() => setShowUserModal(false)} />}
       {showAuditModal && <AuditLogModal onClose={() => setShowAuditModal(false)} />}

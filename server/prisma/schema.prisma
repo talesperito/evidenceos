@@ -28,6 +28,8 @@ model User {
   changedDestinations Vestige[]               @relation("DestinationChangedBy")
   passwordResetTokens PasswordResetToken[]
   pcnetActionLogs     PcnetActionLog[]
+  withdrawalRequests      WithdrawalRequest[] @relation("WithdrawalRequestedBy")
+  withdrawalStatusChanges WithdrawalRequest[] @relation("WithdrawalStatusChangedBy")
 
   @@map("users")
   @@schema("public")
@@ -90,6 +92,7 @@ model Vestige {
   involucros         VestigeInvolucro[]
   requisicoes        VestigeRequisicao[]
   pcnetActionLogs    PcnetActionLog[]
+  withdrawalItems    WithdrawalRequestItem[]
 
   @@map("vestiges")
   @@schema("public")
@@ -164,6 +167,52 @@ model PcnetActionLog {
 
   @@index([vestigeId])
   @@map("pcnet_action_logs")
+  @@schema("public")
+}
+
+// Solicitação de retirada de vestígios (docs/plans/2026-08-25-solicitacao-retirada.md).
+// Registra a INTENÇÃO: quem pediu, para quando e por quê. O ato oficial segue sendo a FAV do PCNET.
+// Sem deletedAt: cancelar é status, não exclusão — registro de custódia não se apaga.
+model WithdrawalRequest {
+  id               String    @id @default(uuid())
+  scheduledFor     DateTime  @map("scheduled_for")
+  status           String    @default("SOLICITADA") // SOLICITADA, CONCLUIDA, CANCELADA, NAO_COMPARECEU
+  notes            String?
+  // Preenchido SÓ quando um ADMIN agenda com menos de 24h de antecedência. Nulo = dentro do prazo.
+  // Coluna própria, e não dentro de `notes`, porque "quem furou o prazo e por quê" precisa ser consulta.
+  deadlineOverrideReason String? @map("deadline_override_reason")
+  requestedBy      String    @map("requested_by")
+  requestedAt      DateTime  @default(now()) @map("requested_at")
+  statusChangedBy  String?   @map("status_changed_by")
+  statusChangedAt  DateTime? @map("status_changed_at")
+  statusNote       String?   @map("status_note")
+
+  // Relations
+  requester        User      @relation("WithdrawalRequestedBy", fields: [requestedBy], references: [id])
+  statusChanger    User?     @relation("WithdrawalStatusChangedBy", fields: [statusChangedBy], references: [id])
+  items            WithdrawalRequestItem[]
+
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("withdrawal_requests")
+  @@schema("public")
+}
+
+model WithdrawalRequestItem {
+  // BigInt: nunca devolver este id cru em JSON — o Fastify responde 500 (converter com String()).
+  id           BigInt  @id @default(autoincrement())
+  requestId    String  @map("request_id")
+  vestigeId    String  @map("vestige_id")
+  reason       String  // CÓDIGO (DESTRUICAO, RESTITUICAO, ...), nunca o rótulo exibido
+  reasonDetail String? @map("reason_detail")
+
+  // Relations
+  request      WithdrawalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  vestige      Vestige           @relation(fields: [vestigeId], references: [id])
+
+  @@index([requestId])
+  @@index([vestigeId])
+  @@map("withdrawal_request_items")
   @@schema("public")
 }
 

@@ -11,6 +11,7 @@ import { userRoutes } from './routes/userRoutes';
 import { auditRoutes } from './routes/auditRoutes';
 import { custodyStandardRoutes } from './routes/custodyStandardRoutes';
 import { pcnetRoutes } from './routes/pcnetRoutes';
+import { withdrawalRoutes } from './routes/withdrawalRoutes';
 
 const server = fastify({
   logger: true,
@@ -43,6 +44,7 @@ server.register(categoryRoutes, { prefix: '/api/categories' });
 server.register(userRoutes, { prefix: '/api/admin/users' });
 server.register(auditRoutes, { prefix: '/api/audit' });
 server.register(custodyStandardRoutes, { prefix: '/api/custody-standards' });
+server.register(withdrawalRoutes, { prefix: '/api/withdrawal-requests' });
 
 // Rota de Health Check
 server.get('/api/health', async (request, reply) => {

@@ -1,6 +1,17 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Vestige, ReportData, CategoryStats, SearchFilters } from '../types';
+import { Vestige, ReportData, CategoryStats, SearchFilters, OpenWithdrawalItem } from '../types';
 import { fetchAllVestiges, getCategories } from '../services/dataService';
+import { listOpenWithdrawalItems } from '../services/withdrawalService';
+
+// A rota devolve ordenado por data agendada: o primeiro a entrar no Map é a retirada mais
+// próxima, que é a que o selo do card deve mostrar.
+const buildOpenWithdrawalsMap = (items: OpenWithdrawalItem[]) => {
+  const map = new Map<string, OpenWithdrawalItem>();
+  items.forEach((item) => {
+    if (!map.has(item.vestigeId)) map.set(item.vestigeId, item);
+  });
+  return map;
+};
 
 const normalize = (str: string) =>
   (str || '').toString().toLowerCase().trim()
@@ -40,6 +51,7 @@ export const useVestiges = () => {
   const [report, setReport] = useState<ReportData | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
+  const [openWithdrawals, setOpenWithdrawals] = useState<Map<string, OpenWithdrawalItem>>(new Map());
 
   const availableOptions = useMemo(() => {
     const origins = new Set<string>(categories);
@@ -57,11 +69,19 @@ export const useVestiges = () => {
     setLoading(true);
     setError(null);
     try {
-      const [data, loadedCategories] = await Promise.all([
+      const [data, loadedCategories, openItems] = await Promise.all([
         fetchAllVestiges(),
         getCategories(),
+        // O .catch fica AQUI, na promise individual — nunca no Promise.all inteiro. Sem isto,
+        // uma falha na rota de retiradas derrubaria o Promise.all e a LISTA DE VESTÍGIOS sumiria
+        // da tela por causa de um selo decorativo.
+        listOpenWithdrawalItems().catch((err) => {
+          console.error('Falha ao carregar retiradas agendadas (o selo não será exibido):', err);
+          return [] as OpenWithdrawalItem[];
+        }),
       ]);
       setVestiges(data);
+      setOpenWithdrawals(buildOpenWithdrawalsMap(openItems));
       // Os resultados de busca são um array próprio (`filteredVestiges`). Sem atualizá-lo aqui,
       // recarregar os dados após uma edição deixava o card exibindo a versão antiga do vestígio
       // — a alteração ia para o banco, mas a tela continuava mostrando o valor anterior.
@@ -78,6 +98,16 @@ export const useVestiges = () => {
       return [];
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Atualiza só o selo de retirada agendada, sem recarregar os vestígios nem acionar o
+  // "carregando" da lista — que desmontaria os cards (e o modal aberto dentro de um deles).
+  const refreshOpenWithdrawals = useCallback(async () => {
+    try {
+      setOpenWithdrawals(buildOpenWithdrawalsMap(await listOpenWithdrawalItems()));
+    } catch (err) {
+      console.error('Falha ao atualizar retiradas agendadas (o selo não será exibido):', err);
     }
   }, []);
 
@@ -277,5 +307,7 @@ export const useVestiges = () => {
     refreshData: loadData,
     generateReport,
     clearReport: () => setReport(null),
+    openWithdrawals,
+    refreshOpenWithdrawals,
   };
 };

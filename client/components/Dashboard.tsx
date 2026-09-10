@@ -32,6 +32,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
     refreshData,
     generateReport,
     clearReport,
+    openWithdrawals,
+    refreshOpenWithdrawals,
   } = useVestiges();
 
   const [selectedVestiges, setSelectedVestiges] = useState<Vestige[]>([]);
@@ -215,6 +217,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
           user={user}
           onEdit={handleEdit}
           onDelete={(vestige) => void handleDelete(vestige)}
+          openWithdrawals={openWithdrawals}
+          // Só o índice de retiradas abertas: recarregar tudo poria a lista em "carregando",
+          // desmontaria o card e, com ele, a tela de sucesso do agendamento individual.
+          onWithdrawalCreated={() => void refreshOpenWithdrawals()}
         />
       </main>
 
@@ -264,9 +270,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       )}
 
       {showBulkScheduleModal && (
+        // A seleção não é limpa ao agendar: limpar sem perguntar destruiria o trabalho do usuário.
         <ScheduleModal
           vestiges={selectedVestiges}
           onClose={() => setShowBulkScheduleModal(false)}
+          onCreated={() => void refreshOpenWithdrawals()}
+          openWithdrawals={openWithdrawals}
+          user={user}
         />
       )}
 

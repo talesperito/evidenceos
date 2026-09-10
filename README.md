@@ -26,10 +26,12 @@ O **EvidenceOS** é uma aplicação web full stack desenvolvida para modernizar 
 *   **Invólucros:** um vestígio pode ter múltiplos invólucros vinculados.
 *   **Seleção em Lote ("Carrinho"):** seleção de múltiplos itens para ações em massa (agendamento de retirada).
 
-### 3. 📅 Agendamento de Retirada (Google Agenda)
-*   **Integração Direct Link:** gera links dinâmicos para criar eventos no Google Calendar oficial da unidade.
+### 3. 📅 Solicitação de Retirada
+*   **Registro no EvidenceOS:** toda solicitação de retirada, individual ou em lote, é gravada no sistema (`withdrawal_requests`) com solicitante, data e hora, e o motivo de cada item. O acompanhamento é feito pelo painel "Retiradas Agendadas" (a integração com o Google Agenda foi retirada em 10/09/2026).
 *   **Controle de Motivos:** seleção obrigatória do motivo de saída por item, com opção de aplicar em massa, e justificativa obrigatória para "Outros".
-*   **Regra de Negócio (24h):** bloqueio automático de agendamentos com menos de 24 horas de antecedência.
+*   **Regra de Negócio (24h):** validada também no servidor. Só o ADMIN pode agendar com menos de 24h, com justificativa escrita que fica registrada e destacada no painel.
+*   **Painel "Retiradas Agendadas":** lista as demandas por status e data, marcando atrasadas e urgentes. ADMIN e PERITO registram a retirada item a item (retirada parcial permitida), cancelam ou marcam "Não compareceu". Registrar a retirada move os vestígios marcados para "Retirado" e grava o histórico de destinação.
+*   **Selo no card:** vestígio com retirada agendada exibe o selo âmbar "Retirada agendada".
 
 ### 4. 🔗 Integração com o PCNET
 *   **Acesso Direto por FAV:** abre a tela do PCNET a partir do número de registro FAV do vestígio.
@@ -95,11 +97,13 @@ evidenceos/
 1.  **VISUALIZADOR:**
     *   Pode realizar buscas e selecionar itens.
     *   Pode agendar retiradas e gerar relatórios de visualização.
+    *   Pode consultar o painel de Retiradas Agendadas (sem ações).
     *   Pode consultar Normas/FAQ.
 
 2.  **PERITO:**
     *   Todas as funções do Visualizador.
     *   Pode registrar movimentações relacionadas à custódia dos vestígios sob sua responsabilidade.
+    *   No painel de Retiradas Agendadas: registra a retirada, cancela a solicitação ou marca "Não compareceu".
 
 3.  **ADMIN:**
     *   Todas as funções anteriores.

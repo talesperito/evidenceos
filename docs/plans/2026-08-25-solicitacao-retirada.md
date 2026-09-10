@@ -2,7 +2,9 @@
 
 **Data:** 2026-08-25
 **Revisão:** 2026-08-25 — revisão de engenharia sênior sobre o código real (ver **Parte 12 — Log de Revisão**)
-**Status:** 📋 **PLANO ESCRITO, NADA IMPLEMENTADO.** Nenhuma etapa iniciada. Nenhum arquivo de código foi criado ou alterado por este plano.
+**Atualização:** 2026-09-10 — plano realinhado ao código depois das **múltiplas requisições por vestígio** (commit `9c8efb7`): formato de requisição/invólucro, nome da migration e todas as referências `arquivo:linha` reconferidos. Ver **Parte 12, complemento de 2026-09-10**.
+**Status:** ✅ **IMPLEMENTADO EM 2026-09-10 — backend testado por roteiro, principais cenários de interface testados pelo usuário, sem commit.** Status por etapa na Parte 6; desvios e resultados na Parte 12, complemento "Execução de 2026-09-10".
+**⚠️ Google Agenda retirado em 2026-09-10 por decisão do usuário (R-48):** o acompanhamento é só pelo painel. Ficam **sem efeito** as partes do plano sobre o evento do Google — 2.4 (vale apenas o "gravar primeiro"), 2.7, 4.7, `buildGoogleCalendarUrl`/`markCalendarOpened` na 5.3, o botão da fase 2 na 5.4, a coluna `calendar_opened_at`, T-04, os itens 3, 4 e 11 da 7.3 e a Fase 5 da Parte 9.
 **Escopo:** fazer o EvidenceOS **registrar** as solicitações de retirada de vestígios, que hoje existem apenas como um link para o Google Agenda e não deixam nenhum rastro no sistema.
 
 ---
@@ -47,7 +49,7 @@
 
 ## Parte 0 — Mapa do repositório e fatos verificados
 
-> Tudo nesta parte foi conferido no código em 2026-08-25. É a base factual do plano. Se algo aqui divergir do que você encontrar, **pare e investigue** antes de continuar: significa que o repositório mudou desde a revisão.
+> Tudo nesta parte foi conferido no código em 2026-08-25 e **reconferido em 2026-09-10**. É a base factual do plano. Se algo aqui divergir do que você encontrar, **pare e investigue** antes de continuar: significa que o repositório mudou desde a revisão.
 
 ### 0.1 Onde as coisas ficam de verdade
 
@@ -74,11 +76,12 @@ evidenceos/
 ├── server/
 │   ├── prisma.config.ts         ← ⚠️ é ele que fornece a DATABASE_URL ao CLI
 │   ├── prisma/schema.prisma
-│   ├── prisma/migrations/       ← 4 migrations; padrão de nome AAAAMMDD_000N_descricao
+│   ├── prisma/migrations/       ← 5 migrations; padrão AAAAMMDD_000N_descricao (última: 20260910_0001_add_vestige_requisicoes_e_motivo)
 │   └── src/
 │       ├── server.ts            ← registro de rotas; SEM setErrorHandler global
 │       ├── routes/              ← auth, vestige, pcnet, category, user, audit, custodyStandard
 │       ├── services/auditService.ts
+│       ├── services/vestigeItemService.ts ← regras de invólucro/requisição (número + motivo), desde 2026-09-10
 │       └── db/connection.ts     ← PrismaClient com adapter pg
 └── docs/plans/                  ← este documento
 ```
@@ -94,7 +97,7 @@ evidenceos/
 | TypeScript | client 5.5 · server 6.0 | — |
 | Tailwind | **CDN, sem config** | Ver armadilha A5. |
 
-### 0.3 Baseline de type-check — **ambos limpos em 2026-08-25**
+### 0.3 Baseline de type-check — **ambos limpos em 2026-08-25, reconferido em 2026-09-10**
 
 ```bash
 cd client && npx tsc --noEmit   # exit 0, zero erros
@@ -105,22 +108,29 @@ Qualquer erro que aparecer depois **é seu**. Não existe dívida de tipos herda
 
 ### 0.4 Nomes de campo: banco ≠ front (tabela de tradução obrigatória)
 
-Maior gerador de bug bobo neste projeto. O `client/services/dataService.ts:42-59` faz esta tradução hoje; o `withdrawalService.ts` novo terá de fazer a mesma:
+Maior gerador de bug bobo neste projeto. O `client/services/dataService.ts:43-60` faz esta tradução hoje; o `withdrawalService.ts` novo terá de fazer a mesma:
 
 | Prisma / API (`Vestige`) | Front (`client/types.ts` → `Vestige`) | Observação |
 |---|---|---|
 | `registroFav` (`String?`, **anulável**) | `fav` (`string`, nunca nulo) | mapeado com `item.registroFav ?? ''` |
 | `dataColeta` (`DateTime?`) | `data` (`string` `dd/mm/aaaa`) | formatado com `toLocaleDateString('pt-BR')` |
-| `involucros: { numero }[]` | `involucros: string[]` | achatado |
+| `involucros: { numero, motivo }[]` | `involucros: VestigeItem[]` (`{ numero, motivo }`) | **só itens ativos** — ver aviso abaixo |
 | `category.name` | `planilhaOrigem` | — |
-| `requisicao` (`String?`) | `requisicao` (`string`) | `?? ''` |
+| `requisicoes: { numero, motivo }[]` | `requisicoes: VestigeItem[]` (`{ numero, motivo }`) | **lista (1:N) desde 2026-09-10**; só itens ativos |
 | `material`, `municipio` | iguais | — |
+
+> ⚠️ **Mudou em 2026-09-10 (commit `9c8efb7`).** Até então a requisição era um texto único (`vestiges.requisicao`) e o invólucro chegava ao front achatado em `string[]`. Agora:
+>
+> - Requisição e invólucro são tabelas 1:N (`vestige_requisicoes`, `vestige_involucros`), cada linha com `numero`, `motivo` e `removedAt`. **Item com `removedAt` preenchido foi removido pela tela e nunca deve aparecer**: todo `select` precisa de `where: { removedAt: null }`, com `orderBy: { id: 'asc' }` (o primeiro é o registro inicial, o último é o mais recente). O padrão pronto é o `activeItems`, no topo de `server/src/routes/vestigeRoutes.ts`.
+> - A coluna `vestiges.requisicao` **ainda existe no banco, congelada**, mapeada no Prisma como `requisicaoLegado`. **Não leia nem grave esse campo**: ele não enxerga requisições incluídas depois de 2026-09-10 e será removido em migration futura.
+> - No front, `Vestige.requisicoes` e `Vestige.involucros` são `VestigeItem[]`; o helper `numerosDe(items)` (`client/types.ts`) devolve só os números.
+> - **Para a retirada, o motivo de inclusão não interessa**: a API de retiradas devolve só os números (`string[]`). Ver 4.0b.
 
 **Consequência direta:** a API de retiradas devolve `registroFav`; o corpo do evento do Google e a tela de gestão mostram **FAV**. Não confunda os dois lados.
 
 ### 0.5 Contrato de erro que o front entende
 
-`client/services/apiClient.ts:33-46` (`parseResponse`):
+`client/services/apiClient.ts:32-46` (`parseResponse`):
 
 ```ts
 const message = payload?.message || payload?.error || `HTTP ${response.status}`;
@@ -146,14 +156,14 @@ const user = request.user as { id: string; email: string; name: string; role: st
 | Criar/editar vestígio | ✅ | ✅ | ❌ |
 | Excluir vestígio | ✅ | ❌ | ❌ |
 | Ver logs de auditoria | ✅ | ❌ | ❌ |
-| **Agendar retirada** | ✅ | ✅ | ✅ (README linha 88) |
+| **Agendar retirada** | ✅ | ✅ | ✅ (README linha 97) |
 | **Mudar status da retirada** (novo) | ✅ | ✅ | ❌ |
 
-No servidor o padrão é o `preHandler` `requireEditorAccess` de `server/src/routes/vestigeRoutes.ts:54-59`.
+No servidor o padrão é o `preHandler` `requireEditorAccess` de `server/src/routes/vestigeRoutes.ts:102-107`.
 
 ### 0.8 Auditoria falha em silêncio — por decisão de projeto
 
-`server/src/services/auditService.ts:29-32` engole a exceção e só faz `console.error`. **A tela continua funcionando normalmente mesmo com a auditoria falhando.** Por isso a Parte 7.2 exige conferir a tabela `audit_logs` no banco: "não deu erro na tela" não prova nada.
+`server/src/services/auditService.ts:31-34` engole a exceção e só faz `console.error`. **A tela continua funcionando normalmente mesmo com a auditoria falhando.** Por isso a Parte 7.2 exige conferir a tabela `audit_logs` no banco: "não deu erro na tela" não prova nada.
 
 ---
 
@@ -165,10 +175,10 @@ Dois pontos de entrada, ambos abrindo o mesmo componente:
 
 | Origem | Arquivo | Linha |
 |---|---|---|
-| Botão "Agendar (Individual)" no card do vestígio | `client/components/VestigeCard.tsx` | 265-272 |
-| Renderização do modal individual | `client/components/VestigeCard.tsx` | 307-312 |
+| Botão "Agendar (Individual)" no card do vestígio | `client/components/VestigeCard.tsx` | 277-284 |
+| Renderização do modal individual | `client/components/VestigeCard.tsx` | 318-323 |
 | Botão "Agendar Lote" na barra flutuante de selecionados | `client/components/Dashboard.tsx` | 247-253 |
-| Renderização do modal em lote | `client/components/Dashboard.tsx` | 267-272 |
+| Renderização do modal em lote | `client/components/Dashboard.tsx` | 266-271 |
 | Componente do modal | `client/components/ScheduleModal.tsx` | arquivo inteiro |
 
 O modal pede, **por item**, o motivo da saída (`Destruição`, `Restituição`, `Análise pela Investigação`, `Solicitação Judicial`, `Outros`), e globalmente uma data, um horário e observações gerais.
@@ -177,10 +187,10 @@ O modal pede, **por item**, o motivo da saída (`Destruição`, `Restituição`,
 
 Verificado linha a linha em 2026-08-25. **Preservar tudo isto:**
 
-- **Bloqueio de antecedência < 24h** — `ScheduleModal.tsx:56-68`. Compara ``new Date(`${date}T${time}`)`` (horário **local**, correto) com `now + 24h`.
-- **Motivo obrigatório em todos os itens** e **justificativa obrigatória** quando o motivo é "Outros" — `ScheduleModal.tsx:70-80`.
+- **Bloqueio de antecedência < 24h** — `ScheduleModal.tsx:57-67`. Compara ``new Date(`${date}T${time}`)`` (horário **local**, correto) com `now + 24h`.
+- **Motivo obrigatório em todos os itens** e **justificativa obrigatória** quando o motivo é "Outros" — `ScheduleModal.tsx:69-81`.
 - **A conversão de horário para o Google está correta.** `formatGCalDate` usa `toISOString()` e o regex `/-|:|\.\d\d\d/g` **preserva o sufixo `Z`**, gerando `20260826T143000Z`. O Google interpreta como UTC e exibe no fuso do usuário. **Não "conserte" isso** — está certo.
-- **`min` no input de data** (`ScheduleModal.tsx:241`), que impede escolher dia passado no seletor.
+- **`min` no input de data** (`ScheduleModal.tsx:237`), que impede escolher dia passado no seletor.
 - **Aplicar motivo em massa** no modo lote — `handleApplyToAll`, `ScheduleModal.tsx:34-46`.
 - **Bolinha vermelha pulsante** no item sem motivo escolhido — bom sinal de pendência, manter.
 - **O modal funciona apesar de estar dentro de um card com `overflow-hidden`** — `position: fixed` escapa do clipping porque não há ancestral com `transform`/`filter`. Não introduza um.
@@ -198,10 +208,10 @@ Consequência prática: o sistema não responde "quais retiradas estão agendada
 
 | Defeito | Arquivo:linha | Correção |
 |---|---|---|
-| Justificativa de "Outros" limitada a 20 caracteres | `ScheduleModal.tsx:212` (`maxLength={20}`) e `:215` (placeholder "máx 20") | subir para **200**, espelhado no Zod do backend, e trocar o placeholder |
+| Justificativa de "Outros" limitada a 20 caracteres | `ScheduleModal.tsx:212` (`maxLength={20}`) e `:214` (placeholder "máx 20") | subir para **200**, espelhado no Zod do backend, e trocar o placeholder |
 | `window.open` sem `noopener` | `ScheduleModal.tsx:130` | resolvido pelo redesenho: a fase de sucesso usa `<a target="_blank" rel="noopener noreferrer">` (Parte 5.4) |
-| `import { ExclamationCircleIcon }` nunca usado | `ScheduleModal.tsx:5` | remover o import morto |
-| `min` do input de data usa **hoje**, mas a regra é **+24h** | `ScheduleModal.tsx:241` | passar `min` para **amanhã** — o seletor deixa de oferecer uma data que a validação vai recusar |
+| `import { ExclamationCircleIcon }` nunca usado | `ScheduleModal.tsx:6` | remover o import morto |
+| `min` do input de data usa **hoje**, mas a regra é **+24h** | `ScheduleModal.tsx:237` | passar `min` para **amanhã** — o seletor deixa de oferecer uma data que a validação vai recusar |
 
 ---
 
@@ -221,15 +231,15 @@ Um agendamento em lote de 12 itens é **um** evento, em **um** horário. Modelar
 
 Este é o ponto mais fácil de errar. Leia com atenção.
 
-A `destinacao` hoje tem dois valores e o `client/types.ts:141-150` documenta o porquê: `NAO_INICIADO` = está na URC, `RETIRADO` = saiu. Uma retirada **agendada** não é nenhum dos dois — o item ainda está fisicamente na prateleira.
+A `destinacao` hoje tem dois valores e o `client/types.ts:141-148` documenta o porquê: `NAO_INICIADO` = está na URC, `RETIRADO` = saiu. Uma retirada **agendada** não é nenhum dos dois — o item ainda está fisicamente na prateleira.
 
-Marcar `RETIRADO` no agendamento faria o card exibir a faixa vermelha "Material não se encontra a URC" (`VestigeCard.tsx:109-124`, condição vinda de `estaForaDaUrc` em `client/types.ts:163-165`) para um vestígio que está lá. Isso **corrompe o sinal visual** que existe hoje e é confiável.
+Marcar `RETIRADO` no agendamento faria o card exibir a faixa vermelha "Material não se encontra a URC" (`VestigeCard.tsx:125-138`, condição vinda de `estaForaDaUrc` em `client/types.ts:164-166`) para um vestígio que está lá. Isso **corrompe o sinal visual** que existe hoje e é confiável.
 
 Portanto: **o agendamento** cria a solicitação e **não escreve nada em `Vestige`**. O card ganha um selo próprio, âmbar, derivado da existência de solicitação em aberto.
 
 A `destinacao` só muda depois, **no momento da retirada de fato**, por comando explícito de um perito no painel — ver Parte 2.9 e 4.8. Agendar nunca mexe em `Vestige`; registrar a retirada, sim.
 
-### 2.4 Gravar primeiro, abrir o Google depois — em dois cliques
+### 2.4 Gravar primeiro, abrir o Google depois — em dois cliques *(⚠️ Google Agenda retirado em 2026-09-10 — vale só o "gravar primeiro"; ver R-48)*
 
 **Armadilha técnica real.** Hoje o `window.open` acontece direto no clique (`ScheduleModal.tsx:130`). Colocar um `await` do POST antes dele faz o **navegador bloquear o popup**: o gesto do usuário se perde durante a chamada assíncrona.
 
@@ -250,7 +260,7 @@ Se o vestígio já tem solicitação em aberto, ou se já está com `destinacao 
 
 Não existe `deletedAt` em `withdrawal_requests`. Uma solicitação cancelada vira `status = CANCELADA` e permanece na tabela. Registro de custódia não se apaga.
 
-### 2.7 O registro é completo; o evento do Google é resumido
+### 2.7 O registro é completo; o evento do Google é resumido *(❌ sem efeito desde 2026-09-10 — ver R-48)*
 
 **Decisão da revisão (R-05).** O corpo do evento do Google vai na querystring da URL, e isso tem limite prático. Medição real com um item típico da URC (material + FAV + requisição + 2 invólucros + motivo):
 
@@ -284,7 +294,7 @@ Daí as três regras que o antigo 🚦 GATE 2 protegia e que continuam de pé:
 
 1. **Nunca automático.** Nenhuma mudança de `destinacao` acontece como consequência lateral de outra ação. Sempre há um clique deliberado, num botão que diz o que faz.
 2. **Item a item.** O perito confirma **quais** materiais saíram, com caixinha de seleção. Ver 2.10.
-3. **Sempre auditado, com o mecanismo que já existe.** A escrita usa a mesma `VestigeDestinationLog` que a tela de edição já usa (`vestigeRoutes.ts:283-301`), gravando de-para, autor e timestamp. O histórico de destinação do vestígio continua sendo um só, contínuo, sem uma trilha paralela que ninguém consulta.
+3. **Sempre auditado, com o mecanismo que já existe.** A escrita usa a mesma `VestigeDestinationLog` que a tela de edição já usa (`vestigeRoutes.ts:369-382`), gravando de-para, autor e timestamp. O histórico de destinação do vestígio continua sendo um só, contínuo, sem uma trilha paralela que ninguém consulta.
 
 ### 2.10 Retirada parcial é o caso normal, não a exceção
 
@@ -305,7 +315,7 @@ O caso "levou tudo" continua sendo um clique: as caixinhas já vêm todas marcad
 
 **Duas decisões do usuário, tomadas juntas.**
 
-**Primeira: a regra sai do navegador e vai para o servidor.** Hoje o bloqueio das 24h existe só no `ScheduleModal.tsx:56-68`. Isso significa que ele **não é uma regra**, é uma sugestão: basta mudar o relógio da máquina, ou chamar a API por fora, para passar por cima sem que nada registre. Validar no servidor torna a regra real.
+**Primeira: a regra sai do navegador e vai para o servidor.** Hoje o bloqueio das 24h existe só no `ScheduleModal.tsx:57-67`. Isso significa que ele **não é uma regra**, é uma sugestão: basta mudar o relógio da máquina, ou chamar a API por fora, para passar por cima sem que nada registre. Validar no servidor torna a regra real.
 
 **Segunda: só o ADMIN pode furar o prazo, e só justificando por escrito.** Nem PERITO, nem VISUALIZADOR.
 
@@ -352,7 +362,7 @@ motivo do item:         DESTRUICAO | RESTITUICAO | ANALISE_INVESTIGACAO | SOLICI
 | `SOLICITACAO_JUDICIAL` | Solicitação Judicial |
 | `OUTROS` | Outros |
 
-> ⚠️ Os **códigos** precisam bater entre `WITHDRAWAL_REASONS` no client e `VALID_REASONS` no backend. Como são ASCII puro, sem acento e sem espaço, não há o risco de divergência por cedilha ou til. Ainda assim, deixe um comentário em cada lado apontando para o outro — é o padrão do projeto em `VALID_ESTADO_CONSERVACAO` (`vestigeRoutes.ts:6-9`) vs. `ESTADO_CONSERVACAO_OPTIONS` (`types.ts:118-125`).
+> ⚠️ Os **códigos** precisam bater entre `WITHDRAWAL_REASONS` no client e `VALID_REASONS` no backend. Como são ASCII puro, sem acento e sem espaço, não há o risco de divergência por cedilha ou til. Ainda assim, deixe um comentário em cada lado apontando para o outro — é o padrão do projeto em `VALID_ESTADO_CONSERVACAO` (`vestigeRoutes.ts:13-16`) vs. `ESTADO_CONSERVACAO_OPTIONS` (`types.ts:127-134`).
 
 ### 3.3 ✅ R-03 — código no banco, rótulo na tela (**decidido pelo usuário em 2026-08-25**)
 
@@ -363,7 +373,7 @@ motivo do item:         DESTRUICAO | RESTITUICAO | ANALISE_INVESTIGACAO | SOLICI
 1. **Mudar a redação não pode quebrar o histórico.** Se um dia o rótulo virar "Análise pela autoridade policial", registros antigos gravados com a frase velha passariam a conviver com a nova, e qualquer contagem por motivo se partiria em duas. Com código, muda-se só a tradução na tela e todo o histórico continua íntegro — sem tocar em registro de cadeia de custódia, que é justamente o que não se reescreve.
 2. **Elimina a divergência por acento.** A lista de motivos existe em dois arquivos (client e server). Com rótulos, os dois precisariam bater cedilha por cedilha; um `Destruicao` sem cedilha em um dos lados começaria a recusar o motivo com erro incompreensível. Com código ASCII, o problema não existe.
 
-**Além disso, é a convenção do próprio projeto:** `ESTADO_CONSERVACAO_OPTIONS` e `DESTINACAO_OPTIONS` já são arrays de `{ value, label }` (`types.ts:118-150`) e o banco já guarda `USADO_FUNCIONANDO`, não "Usado em funcionamento". O plano original era o único ponto do sistema fazendo diferente.
+**Além disso, é a convenção do próprio projeto:** `ESTADO_CONSERVACAO_OPTIONS` e `DESTINACAO_OPTIONS` já são arrays de `{ value, label }` (`types.ts:127-148`) e o banco já guarda `USADO_FUNCIONANDO`, não "Usado em funcionamento". O plano original era o único ponto do sistema fazendo diferente.
 
 **Onde isso aparece na implementação** — confira os cinco pontos ao codar:
 
@@ -435,7 +445,7 @@ model WithdrawalRequestItem {
   withdrawalRequests      WithdrawalRequest[] @relation("WithdrawalRequestedBy")
   withdrawalStatusChanges WithdrawalRequest[] @relation("WithdrawalStatusChangedBy")
   ```
-- No model `Vestige` (`schema.prisma:78-85`):
+- No model `Vestige` (`schema.prisma:84-92`):
   ```prisma
   withdrawalItems WithdrawalRequestItem[]
   ```
@@ -444,7 +454,9 @@ model WithdrawalRequestItem {
 
 ### 3.5 SQL da migration (escrever à mão — ver armadilha A1)
 
-Criar `server/prisma/migrations/20260825_0001_add_withdrawal_requests/migration.sql`, seguindo o padrão das existentes (`20260724_0001_add_pcnet_action_log`). Use a data do dia em que a migration for escrita.
+Criar `server/prisma/migrations/AAAAMMDD_0001_add_withdrawal_requests/migration.sql`, com a **data do dia em que a migration for escrita**, seguindo o padrão das existentes (`20260724_0001_add_pcnet_action_log`).
+
+> ⚠️ **O nome da pasta precisa ordenar depois de `20260910_0001_add_vestige_requisicoes_e_motivo`**, a última já aplicada em produção. O Prisma trata as migrations em ordem alfabética de pasta: uma pasta `20260825_...` criada agora ficaria "antes" de uma migration já aplicada, desalinhando o histórico entre o repositório e o `_prisma_migrations` de produção. Com a data real do dia (setembro de 2026 ou depois), o problema não existe.
 
 ```sql
 -- CreateTable
@@ -538,7 +550,7 @@ SELECT migration_name, finished_at FROM "_prisma_migrations"
 
 ## Parte 4 — Contrato da API
 
-Arquivo novo: `server/src/routes/withdrawalRoutes.ts`. Registrar em `server/src/server.ts`, junto dos demais (`server.ts:38-45`):
+Arquivo novo: `server/src/routes/withdrawalRoutes.ts`. Registrar em `server/src/server.ts`, junto dos demais (`server.ts:39-45`):
 
 ```ts
 import { withdrawalRoutes } from './routes/withdrawalRoutes';
@@ -566,7 +578,7 @@ const body = parsed.data;
 
 #### b) Serialização: BigInt e Date — **nunca devolva o objeto do Prisma cru**
 
-> ⚠️ **T-01, verificado em execução:** devolver um objeto com campo `BigInt` faz o Fastify responder **HTTP 500 — "Do not know how to serialize a BigInt"**. Todas as rotas existentes com BigInt convertem à mão (`auditRoutes.ts:5-8`, `pcnetRoutes.ts:63`). A `WithdrawalRequestItem.id` é BigInt.
+> ⚠️ **T-01, verificado em execução:** devolver um objeto com campo `BigInt` faz o Fastify responder **HTTP 500 — "Do not know how to serialize a BigInt"**. Todas as rotas existentes com BigInt convertem à mão (`auditRoutes.ts:5-8`, `pcnetRoutes.ts:67`). A `WithdrawalRequestItem.id` é BigInt.
 
 Escreva **um** serializador e use em todas as respostas:
 
@@ -579,9 +591,12 @@ const REQUEST_INCLUDE = {
     include: {
       vestige: {
         select: {
-          id: true, material: true, registroFav: true, requisicao: true,
+          id: true, material: true, registroFav: true,
           municipio: true, deletedAt: true,
-          involucros: { select: { numero: true }, orderBy: { createdAt: 'asc' as const } },
+          // Só itens ativos, na ordem de inclusão — mesmo padrão do activeItems de vestigeRoutes.ts.
+          // NUNCA selecione `requisicaoLegado`: é a coluna antiga, congelada (Parte 0.4).
+          requisicoes: { where: { removedAt: null }, select: { numero: true }, orderBy: { id: 'asc' as const } },
+          involucros:  { where: { removedAt: null }, select: { numero: true }, orderBy: { id: 'asc' as const } },
         },
       },
     },
@@ -610,15 +625,15 @@ const serializeRequest = (r: any) => ({
     reasonDetail:  it.reasonDetail,
     material:      it.vestige?.material    ?? null,
     registroFav:   it.vestige?.registroFav ?? null,
-    requisicao:    it.vestige?.requisicao  ?? null,
+    requisicoes:   (it.vestige?.requisicoes ?? []).map((r: any) => r.numero),   // só números
     municipio:     it.vestige?.municipio   ?? null,
-    involucros:    (it.vestige?.involucros ?? []).map((i: any) => i.numero),
+    involucros:    (it.vestige?.involucros  ?? []).map((i: any) => i.numero),   // só números
     vestigeDeleted: Boolean(it.vestige?.deletedAt),
   })),
 });
 ```
 
-> 💡 **Por que `requisicao` e `involucros` estão aí (R-04):** o corpo do evento do Google hoje mostra `MATERIAL / FAV / REQUISIÇÃO / INVÓLUCRO(S) / MOTIVO` (`ScheduleModal.tsx:98-104`). Se a API devolver só `material`, `registroFav` e `municipio`, o evento gerado a partir da solicitação gravada **perde informação em relação ao que o sistema faz hoje** — regressão silenciosa. Os cinco campos precisam vir.
+> 💡 **Por que `requisicoes` e `involucros` estão aí (R-04):** o corpo do evento do Google hoje mostra `MATERIAL / FAV / REQUISIÇÃO(ÕES) / INVÓLUCRO(S) / MOTIVO` (`ScheduleModal.tsx:98-109`). Se a API devolver só `material`, `registroFav` e `municipio`, o evento gerado a partir da solicitação gravada **perde informação em relação ao que o sistema faz hoje** — regressão silenciosa. Os cinco campos precisam vir. **Desde 2026-09-10 requisição e invólucro são listas** — um vestígio pode ter várias de cada, e o evento lista todas (R-35).
 
 #### c) Permissão de edição (cópia local do padrão)
 
@@ -662,7 +677,7 @@ const MAX_ITEMS_PER_REQUEST = 200;
 
 ### 4.2 `POST /api/withdrawal-requests` — criar solicitação
 
-**Permissão:** qualquer usuário autenticado. O README (linha 88) define que VISUALIZADOR pode agendar retiradas; **não restrinja aqui**.
+**Permissão:** qualquer usuário autenticado. O README (linha 97) define que VISUALIZADOR pode agendar retiradas; **não restrinja aqui**.
 
 **Body:**
 ```jsonc
@@ -752,7 +767,7 @@ Pontos que o revisor vai conferir:
 - **Só `ADMIN`.** PERITO e VISUALIZADOR levam 400 igual, sem campo de escape. Checagem no **servidor** — esconder o campo no front não é controle de acesso.
 - **Data no passado cai aqui por consequência**, sem regra separada: é menor que `agora + 24h`.
 - **A justificativa só é gravada se `overrideAplicado`**, nunca só porque veio no corpo.
-- A mensagem para quem não é ADMIN é **a mesma frase que o modal já usa hoje** (`ScheduleModal.tsx:62`), para o usuário não receber dois textos diferentes para a mesma regra.
+- A mensagem para quem não é ADMIN é **a mesma frase que o modal já usa hoje** (`ScheduleModal.tsx:64`), para o usuário não receber dois textos diferentes para a mesma regra.
 
 **Validação de existência (fora do Zod):** buscar todos os `vestigeId` em **uma consulta só**, com `deletedAt: null`. Se algum não existir, **400** listando os ids faltantes. Não crie a solicitação parcialmente.
 
@@ -790,7 +805,7 @@ const created = await prisma.withdrawalRequest.create({
 });
 ```
 
-**Auditoria:** após gravar, `auditService.log` — igual ao `pcnetRoutes.ts:52-62`:
+**Auditoria:** após gravar, `auditService.log` — igual ao `pcnetRoutes.ts:54-64`:
 
 ```ts
 action:     'WITHDRAWAL_REQUESTED'
@@ -828,7 +843,7 @@ const querySchema = z.object({
 
 **Filtro por vestígio:** `where.items = { some: { vestigeId } }`.
 
-**Formato de paginação** — o mesmo já usado em `vestigeRoutes.ts:83-91` e `auditRoutes.ts`:
+**Formato de paginação** — o mesmo já usado em `vestigeRoutes.ts:132-140` e `auditRoutes.ts`:
 
 ```jsonc
 { "items": [ /* serializeRequest */ ], "meta": { "total": 0, "page": 1, "limit": 50, "totalPages": 0 } }
@@ -975,7 +990,7 @@ await prisma.$transaction(async (tx) => {
   });
   if (count === 0) throw new Error('CONFLICT_STATUS');
 
-  // 2) Movimenta cada vestígio marcado, no MESMO padrão de vestigeRoutes.ts:283-301,
+  // 2) Movimenta cada vestígio marcado, no MESMO padrão de vestigeRoutes.ts:369-382,
   //    para que o histórico de destinação continue sendo um só.
   for (const vestigeId of retirados) {
     const atual = await tx.vestige.findUnique({
@@ -1009,7 +1024,7 @@ await prisma.$transaction(async (tx) => {
 });
 ```
 
-> **Não escreva em `destinacaoObs`.** Aquele campo é a observação que o operador digita na tela de edição e aparece em itálico no card (`VestigeCard.tsx:227-231`). Sobrescrevê-lo aqui apagaria o que alguém escreveu antes. O contexto da retirada já fica no `observation` do log de destinação e na `statusNote` da solicitação.
+> **Não escreva em `destinacaoObs`.** Aquele campo é a observação que o operador digita na tela de edição e aparece em itálico no card (`VestigeCard.tsx:238-242`). Sobrescrevê-lo aqui apagaria o que alguém escreveu antes. O contexto da retirada já fica no `observation` do log de destinação e na `statusNote` da solicitação.
 
 **Tratamento do conflito:** capture o `CONFLICT_STATUS` fora da transação e responda **409** com a mesma mensagem da 4.6. Nenhum vestígio terá sido tocado — a transação abortou inteira.
 
@@ -1034,7 +1049,7 @@ Registrar **o que não saiu** é deliberado: daqui a um ano, "por que este vest�
 
 **Idempotência:** chamar duas vezes devolve **409** na segunda. A primeira já concluiu.
 
-### 4.7 `POST /api/withdrawal-requests/:id/calendar-opened`
+### 4.7 `POST /api/withdrawal-requests/:id/calendar-opened` *(❌ removida em 2026-09-10 — ver R-48)*
 
 Preenche `calendarOpenedAt` — **só na primeira abertura**, que é a que importa. Também atômico:
 
@@ -1073,7 +1088,7 @@ Dashboard.tsx
        └─ <WithdrawalRequestsModal user onClose>                 ← novo
 ```
 
-**Dois pontos de renderização do `ScheduleModal`.** Toda mudança de assinatura precisa ser aplicada em `Dashboard.tsx:267-272` **e** `VestigeCard.tsx:307-312`. Esquecer um dos dois quebra o type-check — o que, neste caso, é sorte: o compilador pega.
+**Dois pontos de renderização do `ScheduleModal`.** Toda mudança de assinatura precisa ser aplicada em `Dashboard.tsx:266-271` **e** `VestigeCard.tsx:318-323`. Esquecer um dos dois quebra o type-check — o que, neste caso, é sorte: o compilador pega.
 
 ### 5.2 `client/types.ts` — tipos e rótulos
 
@@ -1117,7 +1132,9 @@ export interface WithdrawalRequestItem {
   reasonDetail?: string | null;
   material?: string | null;
   fav: string;                // ← vem de registroFav; ver Parte 0.4
-  requisicao: string;
+  // Só os NÚMEROS dos itens ativos. Atenção: aqui é string[], diferente de
+  // Vestige.requisicoes / Vestige.involucros, que são VestigeItem[] (número + motivo).
+  requisicoes: string[];
   municipio?: string | null;
   involucros: string[];
   vestigeDeleted: boolean;
@@ -1153,7 +1170,7 @@ export const canManageWithdrawals = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN' || user.role === 'PERITO';
 ```
 
-A constante `REASONS` que hoje está solta em `ScheduleModal.tsx:13-19` **é removida** e o modal passa a importar `WITHDRAWAL_REASONS`. Como ela deixa de ser um array de strings e passa a ser um array de objetos, os dois `<select>` do modal (o de aplicar a todos, `:158-160`, e o por item, `:204-206`) mudam de `<option key={r} value={r}>{r}</option>` para `<option key={o.value} value={o.value}>{o.label}</option>`. O type-check pega se você esquecer.
+A constante `REASONS` que hoje está solta em `ScheduleModal.tsx:13-19` **é removida** e o modal passa a importar `WITHDRAWAL_REASONS`. Como ela deixa de ser um array de strings e passa a ser um array de objetos, os dois `<select>` do modal (o de aplicar a todos, `:170-177`, e o por item, `:195-207`) mudam de `<option key={r} value={r}>{r}</option>` para `<option key={o.value} value={o.value}>{o.label}</option>`. O type-check pega se você esquecer.
 
 ### 5.3 `client/services/withdrawalService.ts` — arquivo novo
 
@@ -1165,7 +1182,7 @@ import { WithdrawalRequest, WithdrawalRequestItem, OpenWithdrawalItem } from '..
 
 interface ApiWithdrawalItem {
   id: string; vestigeId: string; reason: string; reasonDetail?: string | null;
-  material?: string | null; registroFav?: string | null; requisicao?: string | null;
+  material?: string | null; registroFav?: string | null; requisicoes?: string[] | null;
   municipio?: string | null; involucros?: string[] | null; vestigeDeleted?: boolean;
 }
 interface ApiWithdrawalRequest { /* espelha serializeRequest da Parte 4.0b */ }
@@ -1178,7 +1195,7 @@ const mapItem = (i: ApiWithdrawalItem): WithdrawalRequestItem => ({
   reasonDetail: i.reasonDetail ?? null,
   material: i.material ?? null,
   fav: i.registroFav ?? '',
-  requisicao: i.requisicao ?? '',
+  requisicoes: i.requisicoes ?? [],
   municipio: i.municipio ?? null,
   involucros: i.involucros ?? [],
   vestigeDeleted: Boolean(i.vestigeDeleted),
@@ -1197,10 +1214,10 @@ Funções exportadas:
 | `listOpenWithdrawalItems()` | `GET /open-items` | array plano, sem paginação |
 | `updateWithdrawalStatus(id, status, statusNote?)` | `PATCH /:id/status` | só `CANCELADA` e `NAO_COMPARECEU` (4.6) |
 | `completeWithdrawal(id, withdrawnVestigeIds, statusNote?)` | `POST /:id/complete` | conclui **e movimenta** os vestígios (4.8) |
-| `markCalendarOpened(id)` | `POST /:id/calendar-opened` | **fire and forget**: quem chama faz `.catch(console.error)`, mesmo padrão de `logPcnetAction` (`VestigeCard.tsx:72-74`) |
+| `markCalendarOpened(id)` | `POST /:id/calendar-opened` | **fire and forget**: quem chama faz `.catch(console.error)`, mesmo padrão de `logPcnetAction` (`VestigeCard.tsx:91-93`) |
 | `buildGoogleCalendarUrl(request)` | — | ver abaixo |
 
-**`buildGoogleCalendarUrl` — mover para cá** toda a montagem que hoje está dentro do `handleConfirm` (`ScheduleModal.tsx:85-128`), incluindo `formatGCalDate`. Passa a receber a solicitação **já gravada**, então:
+**`buildGoogleCalendarUrl` — mover para cá** toda a montagem que hoje está dentro do `handleConfirm` (`ScheduleModal.tsx:83-128`), incluindo `formatGCalDate`. Passa a receber a solicitação **já gravada**, então:
 
 - ⚠️ **traduza o motivo antes de escrever no evento.** O item vem com `reason` em código; o e-mail que a URC recebe **não pode** dizer `MOTIVO DA SAÍDA: ANALISE_INVESTIGACAO`. Use `getWithdrawalReasonLabel(item.reason)`, e para `OUTROS` mantenha o formato de hoje: `Outros: <justificativa>`;
 - o corpo cita o identificador da solicitação (é o que permite achar a lista completa quando ela for truncada);
@@ -1219,7 +1236,17 @@ const rodapeItens = ocultos > 0
   : '';
 ```
 
-Preserve **integralmente** o formato de bloco por item que existe hoje (`MATERIAL / FAV / REQUISIÇÃO / INVÓLUCRO(S) / MOTIVO DA SAÍDA`), o título dinâmico, o `location` e o `add=pericia.lavras@gmail.com`. E preserve `formatGCalDate` como está — ver 1.2.
+Preserve **integralmente** o formato de bloco por item que existe hoje (`ScheduleModal.tsx:104-108`), que desde 2026-09-10 é:
+
+```
+---
+MATERIAL: <material>
+FAV: <fav>
+REQUISIÇÃO(ÕES): <n1>, <n2> | INVÓLUCRO(S): <n1>, <n2>
+MOTIVO DA SAÍDA: <rótulo do motivo>
+```
+
+com os números separados por vírgula e `N/I` quando a lista está vazia. Preserve também o título dinâmico, o `location` e o `add=pericia.lavras@gmail.com`. E preserve `formatGCalDate` como está — ver 1.2.
 
 ### 5.4 `client/components/ScheduleModal.tsx` — reescrita do submit
 
@@ -1251,7 +1278,7 @@ const [overrideReason, setOverrideReason] = useState('');   // justificativa de 
 
 #### Fase 1a — a validação das 24h deixa de ser um beco sem saída para o ADMIN
 
-A validação de hoje (`ScheduleModal.tsx:56-68`) **para o fluxo** com um erro vermelho. Ela continua fazendo exatamente isso para PERITO e VISUALIZADOR. Para ADMIN, muda de bloqueio para **passagem com pedágio**:
+A validação de hoje (`ScheduleModal.tsx:57-67`) **para o fluxo** com um erro vermelho. Ela continua fazendo exatamente isso para PERITO e VISUALIZADOR. Para ADMIN, muda de bloqueio para **passagem com pedágio**:
 
 ```ts
 const ANTECEDENCIA_MINIMA_MS = 24 * 60 * 60 * 1000;
@@ -1319,7 +1346,7 @@ Requisitos de UI desta fase:
 - Corrigir `maxLength={20}` → `maxLength={200}` e o placeholder.
 - Corrigir o `min` do input de data — **amanhã para PERITO/VISUALIZADOR, hoje para ADMIN** (defeito da 1.4 + exceção da 2.11; ver o aviso na fase 1a).
 - Remover o import morto de `ExclamationCircleIcon`.
-- **Encadear o `user` pelos dois pontos de renderização** (5.1): `Dashboard.tsx:267-272` já tem `user` à mão; `VestigeCard.tsx:307-312` repassa o próprio `user`, que é opcional.
+- **Encadear o `user` pelos dois pontos de renderização** (5.1): `Dashboard.tsx:266-271` já tem `user` à mão; `VestigeCard.tsx:318-323` repassa o próprio `user`, que é opcional.
 
 #### Fase 2 — sucesso (nova)
 
@@ -1385,13 +1412,13 @@ Expor `openWithdrawals` no retorno do hook.
 
 **Não** mexa em `fetchAllVestiges` nem na query de vestígios — a busca é o caminho crítico da tela e não deve ganhar peso por causa disto.
 
-> Nota de custo: `searchVestiges` chama `loadData()` a cada busca (`useVestiges.ts:88`), então a rota `/open-items` é chamada em toda pesquisa. É uma consulta indexada devolvendo poucas centenas de linhas curtas — irrelevante perto do `fetchAllVestiges`, que já pagina a base inteira. Não otimize isso preventivamente.
+> Nota de custo: `searchVestiges` chama `loadData()` a cada busca (`useVestiges.ts:93`), então a rota `/open-items` é chamada em toda pesquisa. É uma consulta indexada devolvendo poucas centenas de linhas curtas — irrelevante perto do `fetchAllVestiges`, que já pagina a base inteira. Não otimize isso preventivamente.
 
 ### 5.6 `client/components/VestigeCard.tsx` — selo "Retirada agendada"
 
 **Novas props:** `withdrawal?: OpenWithdrawalItem` e `onWithdrawalCreated?: () => void`.
 
-**Onde o selo entra.** Dentro da célula **"Situação"** (`VestigeCard.tsx:216-231`), como segunda linha logo abaixo do badge existente:
+**Onde o selo entra.** Dentro da célula **"Situação"** (`VestigeCard.tsx:228-243`), como segunda linha logo abaixo do badge existente:
 
 ```tsx
 {withdrawal && (
@@ -1409,16 +1436,16 @@ com `formatCurto` produzindo `26/08 14h`.
 **Regras de cor — não improvise:**
 
 - **Âmbar** = há retirada agendada, o item **está** na URC.
-- **Vermelho** = `estaForaDaUrc`, o item **não está** na URC (faixa lateral + aviso no topo + badge, `VestigeCard.tsx:109-124` e `216-231`).
+- **Vermelho** = `estaForaDaUrc`, o item **não está** na URC (faixa lateral + aviso no topo + badge, `VestigeCard.tsx:125-138` e `216-231`).
 - **O vermelho já significa uma coisa e não pode passar a significar duas.** Se um vestígio estiver simultaneamente `RETIRADO` **e** com solicitação aberta (acontece: remarcação, dado defasado), **os dois sinais aparecem** — vermelho no topo, âmbar na Situação. É informação verdadeira e o operador precisa vê-la.
 
 **Não** coloque o selo âmbar como faixa no topo: aquele espaço é do alerta vermelho, e dois avisos empilhados no topo transformam o card num painel de alarmes.
 
-O `<ScheduleModal>` renderizado em `VestigeCard.tsx:307-312` passa a receber `onCreated={() => onWithdrawalCreated?.()}`.
+O `<ScheduleModal>` renderizado em `VestigeCard.tsx:318-323` passa a receber `onCreated={() => onWithdrawalCreated?.()}`.
 
 ### 5.7 `client/components/SearchResults.tsx` — repasse de props
 
-Duas props novas, só encaminhadas: `openWithdrawals?: Map<string, OpenWithdrawalItem>` e `onWithdrawalCreated?: () => void`. No `map` dos cards (`SearchResults.tsx:180-190`):
+Duas props novas, só encaminhadas: `openWithdrawals?: Map<string, OpenWithdrawalItem>` e `onWithdrawalCreated?: () => void`. No `map` dos cards (`SearchResults.tsx:184-191`):
 
 ```tsx
 <VestigeCard
@@ -1432,7 +1459,7 @@ Duas props novas, só encaminhadas: `openWithdrawals?: Map<string, OpenWithdrawa
 
 - Pegar `openWithdrawals` do `useVestiges()`.
 - Repassar para `<SearchResults>` junto com `onWithdrawalCreated={() => void refreshData()}`.
-- No `<ScheduleModal>` do lote (`Dashboard.tsx:267-272`): `onCreated={() => void refreshData()}`.
+- No `<ScheduleModal>` do lote (`Dashboard.tsx:266-271`): `onCreated={() => void refreshData()}`.
 - **Não limpar a seleção automaticamente** — decisão da Parte 2.8.
 
 ### 5.9 `client/components/WithdrawalRequestsModal.tsx` — arquivo novo
@@ -1483,7 +1510,7 @@ Modal de gestão, no padrão de `AuditLogModal.tsx` (que usa `createPortal` — 
 
 8. **Solicitação já concluída** mostra, na linha, quem registrou e quando (`statusChangedByName`, `statusChangedAt`) e a `statusNote` — inclusive o `Retirada parcial: 8 de 12 itens.` gravado automaticamente. Sem ações disponíveis: status terminal é terminal (2.6).
 
-**Como se corrige um erro** (precisa estar claro para quem for implementar, e vale explicar ao usuário): se o perito marcar um item por engano, **não** se reabre a solicitação. Corrige-se pela tela de edição do vestígio, mudando a `destinacao` de volta — caminho que **já existe** e **já grava** `VestigeDestinationLog` com de-para, autor e timestamp (`vestigeRoutes.ts:283-301`). O erro e a correção ficam os dois no histórico, que é como registro de custódia deve se comportar: não se apaga, se retifica.
+**Como se corrige um erro** (precisa estar claro para quem for implementar, e vale explicar ao usuário): se o perito marcar um item por engano, **não** se reabre a solicitação. Corrige-se pela tela de edição do vestígio, mudando a `destinacao` de volta — caminho que **já existe** e **já grava** `VestigeDestinationLog` com de-para, autor e timestamp (`vestigeRoutes.ts:369-382`). O erro e a correção ficam os dois no histórico, que é como registro de custódia deve se comportar: não se apaga, se retifica.
 
 ### 5.10 `client/components/AdminPanel.tsx` — botão de acesso
 
@@ -1491,14 +1518,14 @@ Acrescentar "Retiradas Agendadas" ao Painel Operacional:
 
 - **Grade:** hoje é `lg:grid-cols-5` com 5 botões (`AdminPanel.tsx:106`). Com 6, passar para **`lg:grid-cols-3`** (duas linhas de 3). `grid-cols-6` espremeria rótulos longos como "Gerenciar Usuários". O `sm:grid-cols-2` continua igual.
 - **`hasPermission`:** tratar `'RETIRADAS'` retornando `true` — todos **veem** a lista; só ADMIN/PERITO **agem** nela, controle que fica dentro do modal (5.9, item 5) **e no servidor** (`requireEditorAccess`).
-  > **Por que o VISUALIZADOR também vê a lista.** O usuário pediu o painel pensando em perito e admin, e são eles que vão trabalhar nele. Mas o VISUALIZADOR **é quem cria a solicitação** (README linha 88) — se ele não puder conferir que o agendamento dele foi registrado, o cenário 1 da Parte 7.3, que é o problema central deste plano, volta a existir por outro caminho. Ele vê e não mexe. Se o usuário preferir esconder o botão dele, basta trocar este `true` por `canManageWithdrawals(user)` — mudança de uma linha, sem efeito nenhum no backend, que já barra por perfil.
-- **Passar pelo `handleAction`**, que já registra auditoria de acesso ao recurso (`AdminPanel.tsx:51-62`).
+  > **Por que o VISUALIZADOR também vê a lista.** O usuário pediu o painel pensando em perito e admin, e são eles que vão trabalhar nele. Mas o VISUALIZADOR **é quem cria a solicitação** (README linha 97) — se ele não puder conferir que o agendamento dele foi registrado, o cenário 1 da Parte 7.3, que é o problema central deste plano, volta a existir por outro caminho. Ele vê e não mexe. Se o usuário preferir esconder o botão dele, basta trocar este `true` por `canManageWithdrawals(user)` — mudança de uma linha, sem efeito nenhum no backend, que já barra por perfil.
+- **Passar pelo `handleAction`**, que já registra auditoria de acesso ao recurso (`AdminPanel.tsx:52-63`).
 - **Desestruturar o `onRefresh`** (hoje declarado e não usado, `AdminPanel.tsx:23` e `:30`) e repassá-lo ao modal como `onDataChanged` — ver a nota da 5.9.
 - Ícone: `ClipboardListIcon` já existe e é usado em "Logs de Auditoria"; para não repetir, use o `CalendarIcon`, que combina com o domínio.
 
 ### 5.11 `README.md` — manter a documentação verdadeira
 
-A seção **"3. 📅 Agendamento de Retirada (Google Agenda)"** (linha 21) descreve o comportamento antigo. Atualizar para dizer que a solicitação é **registrada no EvidenceOS** e que a agenda passou a ser um passo opcional posterior. Documentação que descreve um fluxo que não existe mais é pior do que documentação nenhuma.
+A seção **"3. 📅 Agendamento de Retirada (Google Agenda)"** (linha 29) descreve o comportamento antigo. Atualizar para dizer que a solicitação é **registrada no EvidenceOS** e que a agenda passou a ser um passo opcional posterior. Documentação que descreve um fluxo que não existe mais é pior do que documentação nenhuma.
 
 ---
 
@@ -1507,7 +1534,7 @@ A seção **"3. 📅 Agendamento de Retirada (Google Agenda)"** (linha 21) descr
 > Ordem obrigatória. As etapas de escrita dependem da infraestrutura das anteriores. Atualize o `**Status:**` de cada etapa antes de encerrar a sessão.
 
 ### ETAPA 0 — Preparação
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — trabalho feito direto na `main`, sem branch e sem commit (fluxo do projeto). Baseline de type-check limpo nos dois lados.
 
 1. `git status` — confirmar `main` limpa e criar branch de trabalho.
 2. Subir o ambiente: `npm run dev:full` na raiz (sobe o Postgres em Docker se preciso, depois backend e frontend).
@@ -1518,7 +1545,7 @@ A seção **"3. 📅 Agendamento de Retirada (Google Agenda)"** (linha 21) descr
 **Pronto quando:** branch criada, `npm run dev:full` servindo, os dois type-checks limpos.
 
 ### ETAPA 1 — Banco de dados
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — migration `20260910_0002_add_withdrawal_requests` (R-42), SQL idêntica à gerada pelo Prisma. Parte 3.6 conferida no banco local: 2 tabelas, coluna `deadline_override_reason`, 4 índices + 2 PKs, 4 FKs, migration registrada.
 
 1. Acrescentar os dois models e as três relações inversas em `server/prisma/schema.prisma` (Parte 3.4).
 2. Criar a pasta e o `migration.sql` à mão (Parte 3.5). **Não use `migrate dev`** — armadilha A1.
@@ -1527,7 +1554,7 @@ A seção **"3. 📅 Agendamento de Retirada (Google Agenda)"** (linha 21) descr
 **Pronto quando:** as 4 consultas de verificação da Parte 3.6 retornarem 2 tabelas, 4 índices, 4 FKs e a migration listada em `_prisma_migrations`. E `cd server && npx tsc --noEmit` limpo.
 
 ### ETAPA 2 — Rotas de leitura
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — verificações L1 a L6 do roteiro automatizado (inclui `item.id` como string e filtro inválido → 400).
 
 Criar `withdrawalRoutes.ts` com a infraestrutura da Parte 4.0 (serializador, `safeParse`, constantes), mais `GET /`, `GET /open-items` e `GET /:id`. Registrar no `server.ts`. Testar com dado inserido à mão no banco.
 
@@ -1545,7 +1572,7 @@ VALUES ((SELECT id FROM withdrawal_requests ORDER BY requested_at DESC LIMIT 1),
 **Pronto quando:** `GET /` e `GET /:id` devolvem **200** com o item aparecendo e `items[0].id` vindo como **string**; `GET /open-items` devolve o par `{vestigeId, requestId, scheduledFor, requesterName}`; `GET /:id` inexistente devolve **404**; sem JWT devolve **401**.
 
 ### ETAPA 3 — Rota de criação 🚦
-**Status:** ⬜ não iniciada — ✅ GATE 1 liberado em 2026-08-25
+**Status:** ✅ concluída em 2026-09-10 — cenários 1–8, 13a–13h, 14 e 16 passando; 7.2 conferida (4 ações de auditoria, só o 13d na consulta de exceções, agendar não tocou em `vestiges`). GATE 1 liberado em 2026-08-25.
 
 1. Implementar `POST /` com todas as validações da Parte 4.2, usando `safeParse` (T-02).
 2. **Regra das 24h com exceção só para ADMIN** (item 5 da 4.2 + Parte 2.11), incluindo a folga de 5 min do relógio e a gravação condicional da justificativa.
@@ -1556,14 +1583,14 @@ VALUES ((SELECT id FROM withdrawal_requests ORDER BY requested_at DESC LIMIT 1),
 **Pronto quando:** os cenários acima passando com os códigos HTTP exatos da tabela, **e** as consultas SQL da Parte 7.2 mostrando (a) a solicitação com seus itens, (b) o `WITHDRAWAL_REQUESTED` em `audit_logs`, e (c) **só o 13d** aparecendo na consulta de exceções de prazo — o 13g não pode estar lá.
 
 ### ETAPA 4 — Rotas de status e calendário
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — cenários 9–12 e 17 passando (`calendar_opened_at` manteve o primeiro instante).
 
 `PATCH /:id/status` (com a trava de status terminal → 409 via `updateMany` atômico, e recusando `CONCLUIDA` com 400) e `POST /:id/calendar-opened` (idempotente). **Sem tocar em `Vestige` em nenhuma das duas.**
 
 **Pronto quando:** cenários 9 a 12 e 17 da Parte 7.1 passando, incluindo a confirmação de que `calendar_opened_at` **mantém o primeiro instante** após duas chamadas.
 
 ### ETAPA 4b — Rota de registro da retirada (movimenta vestígio) ⚠️
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — cenários 18–24 passando, incluindo o 21 (vestígio de fora → 400, nada movimentado). 7.2b: corte 8 RETIRADO / 4 NAO_INICIADO, 8 logs com autor, nota de parcialidade, auditoria com o que ficou, zero logs fora da solicitação.
 
 `POST /:id/complete` (Parte 4.8). **A etapa mais sensível de todo o plano** — é a única que escreve fora das tabelas de retirada.
 
@@ -1576,28 +1603,28 @@ Ordem sugerida dentro da etapa, para não escrever nada errado no meio do caminh
 **Pronto quando:** cenários 18 a 23 da Parte 7.1 passando **e** as consultas SQL da Parte 7.2b confirmando, para uma retirada parcial: os marcados com `destinacao = 'RETIRADO'`, os desmarcados **ainda em `NAO_INICIADO`**, uma linha em `vestige_destination_logs` por item movimentado com o autor certo, e um `WITHDRAWAL_COMPLETED` em `audit_logs`.
 
 ### ETAPA 5 — Camada de serviço no front
-**Status:** ⬜ não iniciada
+**Status:** ✅ concluída em 2026-09-10 — `types.ts` e `withdrawalService.ts`; type-check limpo.
 
 `types.ts` (5.2) e `withdrawalService.ts` (5.3), incluindo a mudança do `buildGoogleCalendarUrl` para lá com o corte de 20 itens (2.7). Nenhuma tela muda ainda.
 
 **Pronto quando:** `cd client && npx tsc --noEmit` limpo, com o `ScheduleModal` ainda funcionando como antes (o `REASONS` local vira import).
 
 ### ETAPA 6 — ScheduleModal em duas fases
-**Status:** ⬜ não iniciada
+**Status:** ✅ testado pelo usuário em 2026-09-10 — cenários 1, 2 e 5 da 7.3 (o 5 com o navegador em "Sem conexão de rede"; a mensagem de falha de conexão foi traduzida no `withdrawalService`). Cenários 3 e 4 sem efeito (Google Agenda retirado). Não testado na tela: 6 (duplo clique).
 
 O coração da mudança (5.4). Inclui os defeitos de carona da 1.4 e o `onCreated` chegando aos **dois** pontos de renderização (5.1).
 
 **Pronto quando:** cenários 1, 2, 3, 5 e 6 da Parte 7.3 passando. O cenário 5 (backend derrubado → erro no modal, **nenhuma aba aberta**) é o que prova a inversão de prioridade da 2.4 — não o pule.
 
 ### ETAPA 7 — Selo no card
-**Status:** ⬜ não iniciada
+**Status:** ✅ testado pelo usuário em 2026-09-10 — cenários 7 (selo âmbar) e 8 (aviso de duplicidade) da 7.3. Não testado na tela: 13 (rota `/open-items` derrubada). Ver R-45.
 
 `useVestiges.ts` (5.5, com o `.catch` no lugar certo — T-03), `VestigeCard.tsx` (5.6), `SearchResults.tsx` (5.7) e `Dashboard.tsx` (5.8).
 
 **Pronto quando:** cenário 7 da Parte 7.3 passando **e** a degradação silenciosa confirmada: com a rota `/open-items` derrubada de propósito, a listagem de vestígios continua funcionando normalmente, sem selo e sem mensagem de erro na tela.
 
 ### ETAPA 8 — Painel de retiradas (listagem)
-**Status:** ⬜ não iniciada
+**Status:** 🟡 listagem testada pelo usuário como ADMIN em 2026-09-10. **Não testado na tela: cenário 9 (VISUALIZADOR vê o painel sem botões)** — o banco local só tem usuário ADMIN; o bloqueio no servidor está provado pelos cenários 9 e 18 da 7.1. Decisão confirmada pelo usuário: todos os perfis veem o painel e o selo.
 
 `WithdrawalRequestsModal.tsx` — cabeçalho, filtros, estados de lista, linha por solicitação, expansão dos itens, badge "Atrasada" (5.9, itens 1 a 4 e 7 a 8) — e o botão no `AdminPanel.tsx` (5.10), com o `onRefresh` finalmente desestruturado.
 
@@ -1606,14 +1633,14 @@ Sem as ações ainda: primeiro o perito consegue **ver** as demandas, que é a m
 **Pronto quando:** cenário 9 da Parte 7.3 passando, testado **com os três perfis** (ADMIN, PERITO, VISUALIZADOR).
 
 ### ETAPA 8b — Ações do painel, incluindo o registro da retirada ⚠️
-**Status:** ⬜ não iniciada
+**Status:** ✅ testado pelo usuário em 2026-09-10 — cenários 14, 15 e 16 da 7.3 (retirada parcial pelo diálogo, faixa vermelha sem recarregar, contador acompanhando as caixinhas). Frase orientativa acrescentada acima dos botões ("Só parte dos materiais saiu? Clique em 'Registrar retirada' e desmarque o que ficou."), porque o usuário tentou selecionar os itens direto na lista. Não testado na tela: 10 (cancelar / não compareceu — provado no backend pelos cenários 10 e 11), 17 (correção pela edição) e 18 (duas abas — 409 provado pelo cenário 23).
 
 Os três botões e o diálogo de "Registrar retirada" com checkbox por item (5.9, itens 5 e 6).
 
 **Pronto quando:** cenários 10, 14, 15, 16 e 17 da Parte 7.3 passando. O **cenário 15 (retirada parcial)** é o que prova a Parte 2.10 — é o mais importante desta etapa e o mais fácil de deixar para depois. Não deixe.
 
 ### ETAPA 9 — Verificação ponta a ponta
-**Status:** ⬜ não iniciada
+**Status:** ✅ em 2026-09-10 — 7.1, 7.2, 7.2b e 7.4 ✅ (roteiro automatizado, nenhum 500); README ✅. 7.3: cenários 1, 2, 5, 7, 8, 14, 15, 16 e 19–23 (regra das 24h como PERITO e ADMIN) testados pelo usuário. Ficaram sem teste de tela: 6, 9, 10, 12, 13, 17, 18 e 24 — todos com a regra correspondente provada no backend, exceto 6, 12 e 13, que são só de interface.
 
 Executar a **Parte 7 inteira**, incluindo o type-check dos dois lados e a atualização do README (5.11).
 
@@ -1622,7 +1649,7 @@ Executar a **Parte 7 inteira**, incluindo o type-check dos dois lados e a atuali
 **Pronto quando:** as três subseções da Parte 7 completas, com o resultado real de cada uma anotado aqui neste documento.
 
 ### ETAPA 10 — Commit e implantação
-**Status:** ⬜ não iniciada
+**Status:** ⬜ não iniciada — aguardando o pedido de commit do usuário.
 
 Só depois da ETAPA 9 passar por completo. Ver Parte 8. **Commit e push só com pedido explícito do usuário.**
 
@@ -1870,7 +1897,7 @@ Mudança **full-stack**: `server/` **e** `client/`, com migration nova.
 Pedida explicitamente pelo usuário. Deixou de ser fase futura: virou a rota **4.8**, a tela **5.9 itens 5-6** e as etapas **4b** e **8b**. O guarda-corpo que o gate protegia foi mantido inteiro — comando explícito, item a item, sempre auditado (Partes 2.9 e 2.10).
 
 ### Fase 4 — Encadear com "Movimentar FAV" *(agora o próximo passo natural)*
-Na tela de retiradas, botão que abre direto a movimentação no PCNET para cada FAV, reaproveitando `buildPcnetUrl` e `logPcnetAction` (`dataService.ts:152-176`).
+Na tela de retiradas, botão que abre direto a movimentação no PCNET para cada FAV, reaproveitando `buildPcnetUrl` e `logPcnetAction` (`dataService.ts:154-179`).
 
 Com a Fase 3 dentro do escopo, isto ficou mais óbvio do que era: o perito já vai estar no painel, com a pessoa na frente, tendo acabado de marcar o que saiu — e o **ato oficial** ainda precisa ser feito na FAV do PCNET. O painel é o lugar exato para esse botão. **Continua fora do escopo deste plano**, mas é a primeira coisa a considerar depois dele.
 
@@ -1895,7 +1922,7 @@ Hoje o evento nasce na conta Google de quem clicou (Parte 1.3, item 4). Gravar d
 | Vetor | Avaliação |
 |---|---|
 | **Autenticação** | Todas as 7 rotas ficam sob `addHook('onRequest', jwtVerify)`, igual às demais. Nenhuma rota pública nova. |
-| **Autorização** | Criar/ler: qualquer autenticado (decisão de negócio, README linha 88). Mudar status **e registrar retirada**: ADMIN/PERITO via `requireEditorAccess`, **checado no servidor** — esconder o botão no front nunca é controle de acesso. |
+| **Autorização** | Criar/ler: qualquer autenticado (decisão de negócio, README linha 97). Mudar status **e registrar retirada**: ADMIN/PERITO via `requireEditorAccess`, **checado no servidor** — esconder o botão no front nunca é controle de acesso. |
 | **Escalada de privilégio** | **Nenhuma.** A `/complete` (4.8) permite a ADMIN/PERITO exatamente o que eles **já podem** fazer hoje pelo `PUT /api/vestiges/:id`: mudar a `destinacao`. Muda o caminho e o contexto, não o poder. |
 | **Regra de negócio contornável** | **Corrigida.** A regra das 24h sai do navegador e passa a valer no servidor (2.11). Hoje ela é burlável mudando o relógio da máquina ou chamando a API direto — depois, não. A exceção é **exclusiva do ADMIN**, exige justificativa e fica gravada em coluna própria. O front decide se **mostra** o caminho da exceção; quem **decide** é o servidor. |
 | **IDOR / alteração de alvo indevido** | 🔒 **Único ponto real da feature, e tem defesa própria.** A `/complete` recebe uma lista de `vestigeId` no corpo. Sem a checagem de subconjunto (4.8, item 3), um PERITO poderia marcar como retirado **qualquer vestígio do sistema** passando um uuid arbitrário. A validação é obrigatória e tem teste dedicado (cenário 21). Fora isso, o sistema não segrega vestígios por usuário — todo perfil já lê tudo (Parte 4.5). |
@@ -1912,7 +1939,7 @@ Hoje o evento nasce na conta Google de quem clicou (Parte 1.3, item 4). Gravar d
 
 - **A migration é aditiva.** Nenhuma coluna ou tabela existente é alterada, nenhum dado histórico é reescrito.
 - **`Vestige` só muda num lugar, e é o lugar certo.** Agendar não toca em vestígio nenhum (2.3). A `destinacao` só se move pela `/complete` (4.8), por comando explícito de um perito que está presenciando a entrega (2.9), item a item (2.10).
-- **A escrita reaproveita o mecanismo de auditoria que já existe.** `VestigeDestinationLog` grava de-para, autor, timestamp e observação — a mesma tabela que a tela de edição usa (`vestigeRoutes.ts:283-301`). O histórico de destinação do vestígio continua **um só**, contínuo, sem trilha paralela.
+- **A escrita reaproveita o mecanismo de auditoria que já existe.** `VestigeDestinationLog` grava de-para, autor, timestamp e observação — a mesma tabela que a tela de edição usa (`vestigeRoutes.ts:369-382`). O histórico de destinação do vestígio continua **um só**, contínuo, sem trilha paralela.
 - **Trilha nova, mais completa do que hoje:** quatro ações auditadas (`WITHDRAWAL_REQUESTED`, `WITHDRAWAL_STATUS_CHANGED`, `WITHDRAWAL_CALENDAR_OPENED`, `WITHDRAWAL_COMPLETED`), cada uma com usuário, timestamp e detalhes, além dos campos `requestedBy/At` e `statusChangedBy/At` na própria tabela.
 - **O que NÃO saiu também fica registrado.** Numa retirada parcial, a auditoria guarda `notWithdrawnVestigeIds` e a `statusNote` diz "8 de 12". Essa é a informação que some em quase todo sistema e que alguém vai procurar um ano depois.
 - **Registro imutável na prática:** sem exclusão (2.6), sem reabertura de status terminal (4.6), sem edição de itens após a criação.
@@ -1925,7 +1952,7 @@ Hoje o evento nasce na conta Google de quem clicou (Parte 1.3, item 4). Gravar d
 
 Encontrados durante a revisão. **Nenhum é introduzido por este plano** e nenhum deve ser corrigido dentro dele sem pedido explícito do usuário.
 
-1. **CORS reflexivo com credenciais** — `server/src/server.ts:19-27` usa `origin: true` + `credentials: true`, o que reflete qualquer origem. **Risco real hoje: baixo**, porque o cookie de refresh é `sameSite: 'lax'` e não viaja em fetch cross-site, e o access token fica em `localStorage` (não é enviado automaticamente). Endurecer para uma allowlist de origens seria higiene, não emergência.
+1. **CORS reflexivo com credenciais** — `server/src/server.ts:20-27` usa `origin: true` + `credentials: true`, o que reflete qualquer origem. **Risco real hoje: baixo**, porque o cookie de refresh é `sameSite: 'lax'` e não viaja em fetch cross-site, e o access token fica em `localStorage` (não é enviado automaticamente). Endurecer para uma allowlist de origens seria higiene, não emergência.
 2. **Access token em `localStorage`** — `apiClient.ts:1-5`. Qualquer XSS o exfiltra. Mitigação real é não ter XSS; a alternativa (token só em memória) custa re-login a cada refresh de página.
 3. **Sem rate limit no login** — `POST /api/auth/login` não tem throttling. Há auditoria de `LOGIN_FAILED`, mas nada barra tentativas repetidas.
 
@@ -1941,7 +1968,7 @@ Encontrados durante a revisão. **Nenhum é introduzido por este plano** e nenhu
 | **T-02** | **`ZodError` vira 500, não 400.** O `server.ts` não tem `setErrorHandler`. | Todos os cenários 3, 5, 6, 7 e 16 da Parte 7.1 respondem **500** com o JSON bruto do Zod no `message`. O usuário vê um despejo técnico ilegível. | `safeParse` + `reply.status(400).send({ message: z.prettifyError(err) })`, Parte 4.0a. |
 | **T-03** | **`.catch` no lugar errado derruba a tela inteira.** | Pôr `listOpenWithdrawalItems()` cru no `Promise.all` do `loadData` faz uma falha da rota de retiradas rejeitar o `Promise.all`, cair no `catch` do `loadData` e **esvaziar a lista de vestígios**. Um selo decorativo derruba a função principal do sistema. | `.catch` na promise individual, **antes** de entrar no `Promise.all` — Parte 5.5. |
 | **T-04** | **URL do Google estoura em lote grande.** | 50 itens = 14.425 chars; 200 itens = 56.875 chars. A aba abre em branco, trunca ou nem navega — sem erro nenhum no EvidenceOS. | Corte em 20 itens no corpo do evento, Parte 2.7 / 5.3. |
-| **T-05** | **Perda de informação no evento do Google.** | Se a API devolver só `material`/`registroFav`/`municipio`, o evento perde `REQUISIÇÃO` e `INVÓLUCRO(S)`, que existem hoje. Regressão que ninguém percebe até alguém precisar do dado. | Incluir os 5 campos + `involucros` no `REQUEST_INCLUDE`, Parte 4.0b. |
+| **T-05** | **Perda de informação no evento do Google.** | Se a API devolver só `material`/`registroFav`/`municipio`, o evento perde `REQUISIÇÃO(ÕES)` e `INVÓLUCRO(S)`, que existem hoje. Regressão que ninguém percebe até alguém precisar do dado. | Incluir `requisicoes` e `involucros` (listas, só itens ativos) no `REQUEST_INCLUDE`, Parte 4.0b. |
 | **T-06** | **Selo some em silêncio a partir da 201ª solicitação aberta.** | Se o selo for alimentado por `GET /` (teto de 200 por página), cards param de mostrar o selo sem erro nenhum. | Rota dedicada `/open-items` sem paginação, Parte 4.4. |
 | **T-07** | **Solicitação gravada e tela sem reagir.** | Sem o `onCreated`, o usuário grava, fecha o modal e não vê mudança nenhuma — conclui que não funcionou e agenda de novo. | Prop `onCreated` encadeada nos **dois** pontos de renderização, Partes 2.8 / 5.4 / 5.8. |
 | **T-08** | **Corrida entre dois operadores mudando status.** | `findUnique` + `update` deixa o segundo sobrescrever o primeiro, e o `statusChangedBy` registra a pessoa errada. | `updateMany` com `where: { id, status: 'SOLICITADA' }`, Parte 4.6. |
@@ -1949,11 +1976,14 @@ Encontrados durante a revisão. **Nenhum é introduzido por este plano** e nenhu
 | **T-11** | **`/complete` sem a checagem de subconjunto.** | Um PERITO consegue marcar como retirado **qualquer vestígio do sistema**, mandando um uuid arbitrário no corpo. Não aparece em teste nenhum de caso feliz. | Validar que todo id enviado pertence à solicitação, **antes** da transação — 4.8 item 3, cenário 21. |
 | **T-12** | **Concluir a solicitação inteira quando a retirada foi parcial.** | Vestígios que continuam na prateleira passam a constar como fora da URC. Mentira gravada em registro de custódia, e ninguém percebe até alguém procurar o material. | Checkbox por item, com o backend recebendo só o que saiu — Partes 2.10 e 4.8. |
 | **T-13** | **Movimentar vestígio fora de transação.** | Falha no meio deixa metade dos vestígios como `RETIRADO` e a solicitação ainda `SOLICITADA`. Ao repetir a operação, os já movimentados não geram log (a 4.8 os ignora) — e o registro fica permanentemente incompleto. | `prisma.$transaction` envolvendo status + todos os vestígios — 4.8. |
-| **T-14** | **Sobrescrever `destinacaoObs` ao registrar a retirada.** | Apaga em silêncio a observação que um operador digitou antes, e que aparece em itálico no card (`VestigeCard.tsx:227-231`). | Não escrever nesse campo. O contexto vai no `observation` do log de destinação — 4.8. |
+| **T-14** | **Sobrescrever `destinacaoObs` ao registrar a retirada.** | Apaga em silêncio a observação que um operador digitou antes, e que aparece em itálico no card (`VestigeCard.tsx:238-242`). | Não escrever nesse campo. O contexto vai no `observation` do log de destinação — 4.8. |
 | **T-15** | **`min` do input de data fixado em "amanhã".** | Mata a exceção das 24h pela porta dos fundos: o ADMIN não consegue nem *escolher* hoje, e nenhum erro aparece — parece que a funcionalidade não existe. | `min` = amanhã para PERITO/VISUALIZADOR, **hoje** para ADMIN — Parte 5.4, fase 1a. |
 | **T-16** | **Gravar a justificativa sempre que ela vier no corpo.** | A coluna `deadline_override_reason` enche de texto de agendamento normal, e a consulta "quem furou o prazo" para de significar alguma coisa. | Gravar **só** quando a exceção de fato se aplicou (`overrideAplicado`) — 4.2 item 5, cenário 13g. |
 | **T-17** | **`user!.role` no `ScheduleModal`.** | O `VestigeCard` declara `user?: User` (`:15`), então pode chegar indefinido. Estoura em runtime, na produção, no card. | `const isAdmin = user?.role === 'ADMIN'` — na dúvida, não é admin. Parte 5.4. |
 | **T-10** | **Fuso horário.** | ``new Date(`${date}T${time}`)`` é horário **local** (correto); `toISOString()` converte para UTC (correto); o banco guarda UTC. O erro clássico é "consertar" um dos dois e deslocar tudo em 3 horas. | Não mexa. Exiba sempre com `toLocaleString('pt-BR')`. |
+| **T-18** | **Ler a requisição pela coluna antiga.** *(desde 2026-09-10)* | O Prisma ainda expõe `requisicaoLegado` (coluna `vestiges.requisicao`, congelada). Selecioná-la compila e funciona — mas mostra a requisição de antes de 2026-09-10 e **ignora as incluídas depois**, sem erro nenhum. | Usar sempre a relação `requisicoes`, Parte 0.4 e 4.0b. |
+| **T-19** | **Listar invólucros/requisições sem filtrar `removedAt`.** *(desde 2026-09-10)* | Item removido pela tela (lançado por engano) reaparece no painel de retiradas e no e-mail do Google Agenda que a URC recebe. | `where: { removedAt: null }` em todo `select` dessas relações, Parte 4.0b. |
+| **T-20** | **Migration nomeada com data anterior à última aplicada.** *(desde 2026-09-10)* | Criar a pasta `20260825_0001_...` (a data original do plano) a coloca antes de `20260910_0001_...`, já aplicada em produção — histórico desalinhado entre repositório e banco. | Data real do dia em que a migration for escrita, Parte 3.5. |
 
 ---
 
@@ -1968,7 +1998,7 @@ Revisão de engenharia sênior sobre o código real do repositório. O plano ori
 | **T-02** | **`safeParse` + 400 explícito** (4.0a). | Reproduzido: `ZodError` sem `setErrorHandler` = **HTTP 500**. Todos os "400" da Parte 7.1 eram inalcançáveis do jeito que estava. |
 | **T-03** | **`.catch` na promise individual** (5.5). | O texto do plano ("degrade em silêncio") estava certo; o esboço de código ("buscar junto do `Promise.all`") produziria o oposto. |
 | **R-02** | **Âncora `<a target="_blank">` em vez de `window.open`** (2.4/5.4). | Elimina a classe inteira de bloqueio de popup, em vez de contorná-la. Mantém a arquitetura de duas fases, que é o que importa. |
-| **R-04 / T-05** | **`requisicao` e `involucros` na resposta da API** (4.0b). | Sem eles o evento do Google perde campos que existem hoje. |
+| **R-04 / T-05** | **`requisicao` e `involucros` na resposta da API** (4.0b). *Em 2026-09-10 virou a lista `requisicoes` — ver R-35.* | Sem eles o evento do Google perde campos que existem hoje. |
 | **R-05 / T-04** | **Corte de 20 itens no corpo do evento** (2.7). | Medido: 200 itens = 56.875 chars de URL. O registro guarda tudo; o evento resume. |
 | **R-06 / T-07** | **Prop `onCreated`** encadeada nos dois pontos de renderização (2.8/5.4/5.8). | Sem ela, gravar não muda nada na tela. |
 | **R-07 / T-06** | **Rota `/open-items`** dedicada (4.4). | Evita o selo sumir em silêncio no 201º registro e o payload pesado por selo. |
@@ -2015,4 +2045,45 @@ Decisão do usuário: a regra das 24h **passa a valer no servidor**, com exceç�
 | **R-33** | **Badge 🔶 "Urgência — fora do prazo de 24h"** no painel, com a justificativa ao expandir. | O perito que vai receber a pessoa precisa saber que aquela retirada entrou por exceção. É metade da razão de registrá-la. |
 | **R-34** | **Cenários 13a-13h** (backend) e **19-24** (interface); consulta SQL das exceções na 7.2; verificação da coluna nova na 3.6. | — |
 
-**Correções factuais pontuais:** `estaForaDaUrc` fica em `client/types.ts:163-165`, não em `VestigeCard.tsx`; as linhas dos botões de agendamento foram reconferidas (`VestigeCard.tsx:265-272`, `Dashboard.tsx:247-253`); `client/` não tem `src/`.
+**Correções factuais pontuais:** `estaForaDaUrc` fica em `client/types.ts:164-166`, não em `VestigeCard.tsx`; as linhas dos botões de agendamento foram reconferidas (`VestigeCard.tsx:277-284`, `Dashboard.tsx:247-253`); `client/` não tem `src/`.
+
+### Complemento de 2026-09-10 — realinhamento após as múltiplas requisições
+
+**Nenhuma decisão de arquitetura mudou e nenhuma etapa foi iniciada** — o plano continua inteiro por executar. O que mudou foi o código em volta dele: o commit `9c8efb7` (múltiplas requisições por vestígio e motivo de inclusão, em produção desde 2026-09-10) alterou o formato de requisição e invólucro e deslocou linhas em vários arquivos citados aqui.
+
+| ID | O que mudou | Por quê |
+|---|---|---|
+| **R-35** | **Requisição virou lista.** `requisicao: string` → `requisicoes: string[]` no `REQUEST_INCLUDE` e no serializador (4.0b), em `WithdrawalRequestItem` (5.2) e no `withdrawalService` (5.3). Tabela da 0.4 reescrita. | Desde 2026-09-10 um vestígio tem N requisições em `vestige_requisicoes`. O campo `requisicao` não existe mais no Prisma — o plano antigo nem compilaria. |
+| **R-36** | **Filtro `removedAt: null` e ordem por `id`** nos selects de requisições e invólucros (4.0b). | Remover invólucro/requisição pela tela é remoção lógica. Sem o filtro, o item lançado por engano volta a aparecer. Ver T-19. |
+| **R-37** | **Aviso sobre `requisicaoLegado`** (0.4, T-18). | É a coluna antiga, congelada como cópia de segurança até ser removida. Lê-la compila e mostra dado desatualizado sem erro. |
+| **R-38** | **Formato do evento do Google atualizado** (5.3): a linha é `REQUISIÇÃO(ÕES): a, b \| INVÓLUCRO(S): x, y`. | É o que está em produção desde 2026-09-10 — o "preserve integralmente" precisa apontar para o formato real. |
+| **R-39** | **Nome da migration** deixa de ser `20260825_0001_...` e passa a usar a data real do dia (3.5, T-20). | A pasta com a data original ordenaria antes de uma migration já aplicada em produção. |
+| **R-40** | **Todas as referências `arquivo:linha` reconferidas e corrigidas no próprio texto** — inclusive as citações antigas deste log. Deslocadas pelo commit de 2026-09-10: `VestigeCard.tsx`, `types.ts`, `dataService.ts`, `vestigeRoutes.ts`, `schema.prisma`. Imprecisas desde 2026-08-25 e corrigidas agora: várias do `ScheduleModal.tsx` (import na 6, `min` na 237, erro das 24h na 64, selects em 170-177 e 195-207), `useVestiges.ts:93`, `pcnetRoutes.ts`, `auditService.ts`, `server.ts`, `apiClient.ts`, `SearchResults.tsx`, `Dashboard.tsx:266-271`, `AdminPanel.tsx:52-63`, README (linhas 29 e 97). | A Parte 0 promete fatos verificados; referência errada custa exploração a quem executa. |
+| **R-41** | **Contagem de migrations 4 → 5** (0.1), `vestigeItemService.ts` no mapa e baseline de type-check reconferido (0.3). | — |
+
+**Não mudou:** modelo das tabelas de retirada (3.4), rotas e contratos (Parte 4), regras de negócio (24h no servidor com exceção do ADMIN, retirada parcial, cancelamento como status), telas (Parte 5) e os gates já liberados. A migration de retirada continua **puramente aditiva** — não toca nas tabelas de requisição e invólucro.
+
+### Complemento de 2026-09-10 — Execução
+
+Implementação aprovada pelo usuário ("Faça a implementação do plano já"). Desvios do texto do plano, todos pequenos e deliberados:
+
+| ID | Desvio | Por quê |
+|---|---|---|
+| **R-42** | Migration nomeada `20260910_0002_add_withdrawal_requests`. | Mesmo dia da de requisições; o `_0002` ordena depois dela (T-20). |
+| **R-43** | O serializador devolve também `destinacao` (situação atual do vestígio) em cada item. | O diálogo de "Registrar retirada" precisa mostrar "já consta fora da URC" (5.9, item 6), e o plano não trazia o campo. |
+| **R-44** | A `/complete` trata `FINALIZADO` (legado) como já fora da URC, igual ao `estaForaDaUrc` do client, e ignora vestígio excluído do cadastro. | Evita registrar transição `FINALIZADO → RETIRADO` inexistente e movimentar vestígio apagado. |
+| **R-45** | Criar solicitação recarrega **só** o índice `/open-items` (`refreshOpenWithdrawals`), não o `refreshData`. | O `refreshData` põe a lista em "carregando", o que desmonta o `VestigeCard` — e junto o `ScheduleModal` individual com a tela de sucesso. O "Registrar retirada" continua usando o `refreshData` (via `onDataChanged`), porque muda a situação dos vestígios e roda de dentro do painel. |
+| **R-46** | Ids validados com `z.guid()` em vez de `z.string().uuid()`. | Formato permissivo evita falso 400 por variante de UUID; a existência é conferida no banco de qualquer forma. |
+| **R-47** | `min` do seletor de data calculado no **fuso local**. | O `toISOString()` antigo dava a data em UTC: depois das 21h o seletor já tratava amanhã como "hoje". |
+
+**Resultado dos testes (7.1, 7.2, 7.2b, 7.4):** 48/48 verificações passando, nenhuma resposta 500. Rodados por script contra a API local:
+
+- **Tokens:** o banco de desenvolvimento só tem um usuário ADMIN. Os tokens de PERITO e VISUALIZADOR foram assinados com o `JWT_SECRET` local, usando o id do ADMIN e trocando só o perfil, que é o que as rotas consultam.
+- **Dados de teste:** 14 vestígios `[TESTE RETIRADA]` criados para o roteiro e excluídos logicamente ao final; as solicitações que ficaram abertas foram canceladas.
+- **Banco local:** recebeu também a migration `20260910_0001`, que estava pendente nele.
+
+**Pendente:** Parte 7.3 (interface), teste manual.
+
+| ID | Mudança posterior | Por quê |
+|---|---|---|
+| **R-48** | **Google Agenda retirado** (decisão do usuário, 2026-09-10). Saíram o botão "Abrir no Google Agenda" da tela de sucesso, `buildGoogleCalendarUrl` e `markCalendarOpened` do `withdrawalService`, a rota `POST /:id/calendar-opened`, a ação de auditoria `WITHDRAWAL_CALENDAR_OPENED` e a coluna `calendar_opened_at` — removida da própria migration `20260910_0002`, que ainda não tinha ido para produção; no banco local a coluna foi apagada e o checksum da migration atualizado. | O painel "Retiradas Agendadas" passou a ser o acompanhamento. O evento do Google nascia na agenda pessoal de quem clicava, podia nem ser salvo e cortava lotes grandes em 20 itens. Perde-se o convite por e-mail para pericia.lavras@gmail.com. Roteiro de API reexecutado depois da remoção: 46/48 no script e as 2 restantes (b5, a1) confirmadas por consulta — as falhas eram do próprio script, que comparava `timestamp` sem fuso com um Date do JavaScript e puxava dados da execução anterior; script corrigido. |
