@@ -1,7 +1,15 @@
 
 # EvidenceOS – Sistema de Controle de Vestígios (URC Lavras/MG)
 
-O **EvidenceOS** é uma aplicação web full stack desenvolvida para modernizar e agilizar a gestão da cadeia de custódia na Unidade Regional de Custódia (URC) de Lavras/MG. O sistema conta com backend próprio (Fastify + PostgreSQL) responsável por autenticação, auditoria e integridade da cadeia de custódia, e frontend em React com sincronização a partir da planilha do Google Drive.
+O **EvidenceOS** é uma aplicação web full stack desenvolvida para modernizar e agilizar a gestão da cadeia de custódia na Unidade Regional de Custódia (URC) de Lavras/MG. O sistema conta com backend próprio (Fastify + PostgreSQL) responsável por autenticação, auditoria e integridade da cadeia de custódia, e frontend em React.
+
+> ### 🚩 Marco inicial — 10/09/2026
+>
+> **O EvidenceOS é a fonte de verdade da cadeia de custódia.** Desde 10 de setembro de 2026, todos os lançamentos e edições de vestígios são feitos **diretamente no sistema**.
+>
+> A planilha do Google Drive, que era a base operacional até então, **deixou de ser alimentada** e passou a ser arquivo histórico. Os 5.216 vestígios que ela continha foram migrados para o banco.
+>
+> Consequência para quem for mexer no código: a sincronização a partir da planilha (seção 5) é **operação histórica**. Ela não deve mais ser executada com exclusões — um vestígio que está no banco e não está na planilha é hoje um lançamento normal da equipe, não um resíduo. Ver `docs/plans/2026-07-26-reimportacao-planilha-google.md`, Parte 7.
 
 ---
 
@@ -27,8 +35,9 @@ O **EvidenceOS** é uma aplicação web full stack desenvolvida para modernizar 
 *   **Acesso Direto por FAV:** abre a tela do PCNET a partir do número de registro FAV do vestígio.
 *   **Registro de Solicitação:** cada acesso (visualização de FAV ou movimentação) é logado em `pcnet_action_logs`, com status `SOLICITADO` — o EvidenceOS registra a intenção de acesso, mas não confirma alterações feitas diretamente no PCNET.
 
-### 5. 🔄 Sincronização com a Planilha do Drive
-*   Importação/atualização dos vestígios a partir da planilha oficial do Google Drive, com diagnóstico prévio e relatório de divergências antes de qualquer gravação (ver skill `sincronizador-drive`).
+### 5. 🔄 Sincronização com a Planilha do Drive *(histórica — encerrada em 10/09/2026)*
+*   Importação/atualização dos vestígios a partir da planilha oficial do Google Drive, com diagnóstico prévio e relatório de divergências antes de qualquer gravação (agente `sincronizador-drive`).
+*   **Foi o mecanismo de migração, não é mais operação de rotina.** Com o marco inicial, o banco virou a fonte de verdade e a planilha parou de ser alimentada. Executar a sincronização com exclusões hoje apagaria lançamentos da equipe — o agente tem instrução explícita de recusar isso.
 
 ### 6. 📊 Painel Administrativo e Relatórios
 *   **Relatório Analítico de Custódia:** passivo crítico (itens sem requisição parados há 1, 2 ou 3+ anos), evolução temporal (sparklines por semestre/ano), top categorias por volume.
@@ -97,7 +106,7 @@ evidenceos/
     *   **Inserir/Editar/Excluir** vestígios e categorias.
     *   Gerenciar usuários do sistema.
     *   Visualizar Logs de Auditoria.
-    *   Gerenciar Normas/FAQ e rodar a sincronização com a planilha do Drive.
+    *   Gerenciar Normas/FAQ.
 
 ---
 

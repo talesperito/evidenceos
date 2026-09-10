@@ -1,11 +1,16 @@
 # Plano: Reimportação/Sincronização da Planilha do Google para o Banco da VPS
 
 **Data:** 2026-07-26 · **Última atualização:** 2026-09-10
-**Status:** 🏁 **PRIMEIRA SINCRONIZAÇÃO EXECUTADA EM PRODUÇÃO em 2026-09-10.** Levantamento concluído · Decisões tomadas (Parte 3) · Pipeline implementado no commit `63fa1f6` · Execução real registrada na **Parte 6**.
-**Escopo deste documento:** Parte 1 (como funciona hoje) · Parte 2 (o que impede rodar de novo) · Parte 3 (decisões tomadas) · Parte 4 (abordagens possíveis) · Parte 5 (plano de execução) · **Parte 6 (execução real de 2026-09-10 + pendências)**
+**Status:** 🏁 **PLANO CONCLUÍDO.** Sincronização executada em produção e **MARCO INICIAL ATINGIDO em 2026-09-10** — o EvidenceOS passou a ser a fonte de verdade da cadeia de custódia. Ver **Parte 6** (execução) e **Parte 7** (marco).
+**Escopo:** Partes 1–5 (levantamento e desenho, julho) · Parte 6 (execução real) · **Parte 7 (marco inicial e o que muda daqui em diante)**
 
-> ## 📍 Para quem retomar este documento
-> As Partes 1 a 5 são o levantamento e o desenho, de julho. **O que aconteceu de fato está na Parte 6**, no fim — inclusive os números reais, os procedimentos operacionais que só se descobrem rodando, e as **3 pendências que ainda bloqueiam o "marco inicial"**.
+> ## 🚩 LEIA ANTES DE QUALQUER COISA
+>
+> **O marco inicial aconteceu em 2026-09-10.** A regra que governou todo este documento — *"vale o que está na planilha"* — **deixou de valer**. A planilha do Drive não é mais alimentada, e o banco do EvidenceOS é a fonte de verdade.
+>
+> **Consequência prática:** a operação central deste plano, sincronizar Drive → banco com exclusão do que está só na VPS, **não deve mais ser executada**. Um vestígio ausente da planilha hoje é um lançamento novo da equipe, não resíduo.
+>
+> As Partes 1 a 6 passam a ser **registro histórico** de como a migração foi feita. O que vale hoje está na **Parte 7**.
 
 > ## ⛔ Antes de qualquer coisa: NÃO rode `npm run phase2:run` (nem `phase2:seed`) no estado atual
 >
@@ -421,3 +426,61 @@ Continua em `_phase2-common.cjs:10`, versionada no Git. Ver "Observação de seg
 Estrutura: continua com as **7 colunas originais** (`material`, `requisicao`, `involucro`, `fav`, `municipio`, `data`, `planilhaOrigem`). **A coluna `situação` decidida na Parte 3 nunca foi criada no Apps Script.**
 
 Sujeira conhecida: 2 linhas com ano `202` e 1 com ano `2052` (digitação); 528 linhas sem data; uso do literal `x` como "não informado" em FAV, requisição e material — já normalizado pelo script.
+
+---
+
+# Parte 7 — Marco inicial (2026-09-10)
+
+## 7.1 O que foi decidido
+
+Em 2026-09-10, logo após a sincronização da Parte 6, o usuário declarou o **marco inicial**:
+
+> **A partir de hoje, apenas lançamentos no SaaS.**
+
+A planilha do Google Drive **deixou de ser alimentada**. Os colaboradores passaram a cadastrar e editar vestígios diretamente no EvidenceOS, e o banco de produção passou a ser a **fonte de verdade da cadeia de custódia**.
+
+## 7.2 A inversão da regra
+
+Tudo nas Partes 1 a 6 foi construído sobre a premissa de que a planilha mandava. Essa premissa acabou.
+
+| | Até 2026-09-10 | A partir de 2026-09-10 |
+|---|---|---|
+| Fonte de verdade | planilha do Drive | **banco do EvidenceOS** |
+| Vestígio na VPS e ausente da planilha | resíduo → excluir | **lançamento normal da equipe** |
+| Exclusão automática pela sincronização | aprovada e executada | ❌ **proibida** |
+| Papel da sincronização | operação central | diagnóstico eventual, no máximo inserção |
+
+**O `sync-apply.cjs` não deve mais ser executado com exclusões.** A flag `--sem-exclusoes` passa a ser obrigatória em qualquer uso futuro. Exclusão, a partir de agora, é decisão consciente item a item, feita pela tela do EvidenceOS — que também grava `deletedAt` e também audita.
+
+Isso está registrado como **Regra número zero** no agente `.claude/agents/sincronizador-drive.md`. A aprovação dada em 2026-09-10 para excluir 12 registros **não se estende** a nenhuma execução futura: ela valia para um cenário que deixou de existir.
+
+## 7.3 Rede de segurança já instalada
+
+A mitigação da 6.4.1 (classificação por `importedAt`) entrou **antes** do marco, de propósito. Vestígio criado pela tela cai no Grupo B e é ignorado pela exclusão automática, mesmo que alguém rode o apply por engano.
+
+É uma proteção, não uma licença: a regra 7.2 continua valendo acima dela.
+
+## 7.4 Pendências abertas no momento do marco
+
+### 🔴 As 36 linhas que nunca entraram
+
+36 linhas da planilha — **18 FAVs, cada uma aparecendo em duas linhas** — nunca foram inseridas no banco, porque FAV repetida fica fora da sincronização automática por decisão registrada na Parte 3.
+
+São casos como `Caderno | Caderno` e `Carta | Envelope`: dois objetos distintos acondicionados sob a mesma FAV. O script nunca os resolve sozinho, e com a planilha abandonada **eles não têm mais como entrar automaticamente**.
+
+**Efeito: o EvidenceOS está incompleto em 36 registros.** Existem no acervo e no papel, não no sistema. Resolver exige decisão manual — cadastrar pela tela ou desempatar as FAVs. **Enquanto não for feito, a base não espelha o acervo real.**
+
+### 🟡 Herdadas da Parte 6, que seguem válidas
+
+- **6.4.1 (dívida):** `importedFrom` continua sendo gravado como `google_sheets` para vestígio criado na tela. Não afeta mais a sincronização, mas envenena relatórios que usem o campo para distinguir origem. Correção completa descrita na 6.4.1.
+- **6.4.2:** duplicatas dentro do banco continuam invisíveis para o diagnóstico. Com a equipe cadastrando direto no sistema, o risco de duplicata **aumenta**, não diminui.
+- **6.4.3:** irrelevante a partir de agora — não há mais planilha para atualizar campos a partir dela.
+- **6.4.4:** `fetch` sem timeout. Baixa prioridade, já que a sincronização deixou de ser rotina.
+- **6.4.6:** `APPS_SCRIPT_URL` hardcoded no Git. **Continua sendo exposição de dado**, mesmo com a planilha parada — a URL segue ativa e serve a base inteira a quem tiver o link. Ver "Observação de segurança".
+
+## 7.5 O que fazer com a planilha e o Apps Script
+
+Não decidido ainda. Duas coisas merecem atenção:
+
+1. **A planilha vira arquivo histórico.** Vale garantir que ninguém continue lançando nela por engano — um lançamento perdido lá não chega ao sistema e ninguém percebe.
+2. **O Apps Script continua publicado e servindo a base inteira sem autenticação.** Com a migração encerrada, ele não tem mais função. Despublicá-lo elimina a exposição descrita na "Observação de segurança" de uma vez.
