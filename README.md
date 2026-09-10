@@ -1,91 +1,127 @@
 
 # EvidenceOS – Sistema de Controle de Vestígios (URC Lavras/MG)
 
-O **EvidenceOS** é uma aplicação web progressiva (PWA) desenvolvida para modernizar e agilizar a gestão da cadeia de custódia na Unidade Regional de Custódia (URC) de Lavras/MG. O sistema atua como uma interface moderna e responsiva para dados armazenados em planilhas Google (via Google Apps Script), oferecendo ferramentas avançadas de busca, auditoria e relatórios gerenciais.
+O **EvidenceOS** é uma aplicação web full stack desenvolvida para modernizar e agilizar a gestão da cadeia de custódia na Unidade Regional de Custódia (URC) de Lavras/MG. O sistema conta com backend próprio (Fastify + PostgreSQL) responsável por autenticação, auditoria e integridade da cadeia de custódia, e frontend em React com sincronização a partir da planilha do Google Drive.
 
 ---
 
 ## 🚀 Funcionalidades Principais
 
 ### 1. 🔍 Busca e Localização Avançada
-*   **Busca Inteligente:** Algoritmo híbrido que diferencia buscas numéricas exatas (para IDs como FAV, Requisição) de buscas textuais parciais (para descrição de materiais).
-*   **Filtros Combinados:** Permite refinar resultados por:
-    *   Termo livre (Material, FAV, Involucro, Requisição).
-    *   Município de origem (Lista oficial da regional).
-    *   Tipo de Vestígio (Armas, Drogas, Geral, etc.).
-    *   Intervalo de Datas (Data de entrada).
-*   **Feedback Visual:** Indicadores de carregamento e estados de "Nenhum resultado".
+*   **Busca Inteligente:** algoritmo híbrido que diferencia buscas numéricas exatas (FAV, Requisição) de buscas textuais parciais (descrição de materiais).
+*   **Filtros Combinados:** termo livre (Material, FAV, Invólucro, Requisição), município de origem, categoria/tipo de vestígio e intervalo de datas.
+*   **Feedback Visual:** indicadores de carregamento e estados de "Nenhum resultado".
 
 ### 2. 📦 Gestão de Custódia
-*   **Cálculo Automático de Tempo:** Cada card de vestígio exibe automaticamente há quanto tempo o item está custodiado (dias, meses ou anos).
-*   **Visualização em Card:** Design otimizado para leitura rápida com destaque para dados críticos (FAV, Número do Invólucro).
-*   **Seleção em Lote ("Carrinho"):** Permite selecionar múltiplos itens de diferentes buscas para realizar ações em massa (agendamento de retirada).
+*   **Cálculo Automático de Tempo:** cada card exibe há quanto tempo o item está custodiado.
+*   **Estado de Conservação e Destinação:** cada vestígio tem status de destinação (`NAO_INICIADO`, etc.) com observações, e toda mudança gera um registro em `vestige_destination_logs` (autor, timestamp, status anterior e novo) — a cadeia de custódia é auditável e inquebrável.
+*   **Invólucros:** um vestígio pode ter múltiplos invólucros vinculados.
+*   **Seleção em Lote ("Carrinho"):** seleção de múltiplos itens para ações em massa (agendamento de retirada).
 
 ### 3. 📅 Agendamento de Retirada (Google Agenda)
-*   **Integração Direct Link:** Gera links dinâmicos para criar eventos no Google Calendar oficial da unidade.
-*   **Controle de Motivos (Rigoroso):**
-    *   Seleção obrigatória do motivo de saída para **cada item** individualmente.
-    *   Opção de aplicar motivo em massa para agilidade.
-    *   Campo de justificativa obrigatório para o motivo "Outros".
-*   **Regra de Negócio (24h):** Bloqueio automático de agendamentos com menos de 24 horas de antecedência para garantir tempo hábil de separação.
-*   **Detalhamento:** O evento gerado contém a lista completa de itens, FAVs e os motivos específicos de cada um no corpo do e-mail/evento.
+*   **Integração Direct Link:** gera links dinâmicos para criar eventos no Google Calendar oficial da unidade.
+*   **Controle de Motivos:** seleção obrigatória do motivo de saída por item, com opção de aplicar em massa, e justificativa obrigatória para "Outros".
+*   **Regra de Negócio (24h):** bloqueio automático de agendamentos com menos de 24 horas de antecedência.
 
-### 4. 📊 Painel Administrativo e Relatórios
-*   **Relatório Analítico de Custódia:**
-    *   **Passivo Crítico:** Identifica itens sem número de requisição (alvos de descarte) parados há mais de 1, 2 ou 3 anos.
-    *   **Evolução Temporal:** Gráficos (Sparklines) mostrando a tendência de entrada de materiais por semestre/ano.
-    *   **Top 5:** Categorias com maior volume.
-    *   **Impressão Otimizada:** Estilos CSS específicos (`@media print`) para gerar PDFs limpos e econômicos.
-*   **Gestão de Normas (FAQ):** CRUD completo para cadastrar dúvidas frequentes e procedimentos operacionais padrão.
-*   **Logs de Auditoria:** Rastreabilidade local de ações sensíveis (Login, Buscas realizadas, Alterações de dados, Geração de relatórios).
-*   **Gestão de Usuários:** Cadastro de operadores e administradores com controle de acesso baseado em função (RBAC).
+### 4. 🔗 Integração com o PCNET
+*   **Acesso Direto por FAV:** abre a tela do PCNET a partir do número de registro FAV do vestígio.
+*   **Registro de Solicitação:** cada acesso (visualização de FAV ou movimentação) é logado em `pcnet_action_logs`, com status `SOLICITADO` — o EvidenceOS registra a intenção de acesso, mas não confirma alterações feitas diretamente no PCNET.
 
-### 5. 🛠 CRUD (Criação, Leitura, Atualização, Exclusão)
-*   **Sincronização Bidirecional:** Conecta-se a um script `doGet` e `doPost` no Google Apps Script.
-*   **Edição e Exclusão:** Exclusiva para perfis de Administrador.
-*   **Validação de Dados:** Formulários com máscaras e tipos de dados estritos.
+### 5. 🔄 Sincronização com a Planilha do Drive
+*   Importação/atualização dos vestígios a partir da planilha oficial do Google Drive, com diagnóstico prévio e relatório de divergências antes de qualquer gravação (ver skill `sincronizador-drive`).
 
-### 6. 🎨 Interface e UX
-*   **Dark Mode Nativo:** Interface construída em tons de `Slate-900` para conforto visual em ambientes com pouca luz e economia de energia.
-*   **Responsividade:** Layout totalmente adaptável para Desktops, Tablets e Smartphones.
-*   **Acessibilidade:** Uso de ícones claros, contrastes adequados e feedbacks de ação (Toasts/Alertas).
+### 6. 📊 Painel Administrativo e Relatórios
+*   **Relatório Analítico de Custódia:** passivo crítico (itens sem requisição parados há 1, 2 ou 3+ anos), evolução temporal (sparklines por semestre/ano), top categorias por volume.
+*   **Exportação em PDF:** geração de relatório em PDF a partir da visualização do painel.
+*   **Gestão de Normas (FAQ):** CRUD de dúvidas frequentes e procedimentos operacionais padrão (`custody_standards`).
+*   **Logs de Auditoria:** trilha de ações sensíveis (login, buscas, alterações de dados, geração de relatórios) persistida em `audit_logs`, com usuário, IP, user agent e sessão.
+*   **Gestão de Usuários:** cadastro de operadores/administradores com controle de acesso baseado em função (RBAC: `ADMIN`, `PERITO`, `VISUALIZADOR`).
+
+### 7. 🎨 Interface e UX
+*   **Dark Mode Nativo:** interface construída em tons de `Slate-900`.
+*   **Responsividade:** layout adaptável para desktop, tablet e smartphone.
+*   **Acessibilidade:** ícones claros, contrastes adequados e feedbacks de ação (toasts/alertas).
 
 ---
 
 ## 🛠 Tecnologias Utilizadas
 
-*   **Frontend:** React 19, TypeScript.
+*   **Backend:** Node.js 20+, Fastify 5, TypeScript, Prisma ORM 7.
+*   **Banco de Dados:** PostgreSQL 16 (via Docker Compose em desenvolvimento).
+*   **Autenticação:** JWT (`@fastify/jwt`) + cookies HttpOnly (`@fastify/cookie`), hash de senha com Argon2.
+*   **E-mail:** Nodemailer (ex.: recuperação de senha).
+*   **Frontend:** React 18, TypeScript 5.5, Vite 5.
 *   **Estilização:** Tailwind CSS.
-*   **Backend (Serverless):** Google Apps Script (Proxy para Google Sheets).
-*   **Persistência Local:** LocalStorage (para Usuários, Logs e FAQs nesta versão).
-*   **Ícones:** Heroicons (via SVG components).
+*   **Validação:** Zod (schemas compartilhados de entrada, back e front).
 
 ---
 
-## 🔒 Perfis de Acesso
+## 📁 Estrutura do Projeto
 
-1.  **Usuário Padrão:**
-    *   Pode realizar buscas.
-    *   Pode selecionar itens.
-    *   Pode agendar retiradas.
-    *   Pode gerar relatórios de visualização.
-    *   Pode consultar Normas.
+```
+evidenceos/
+├── server/                    # Fastify backend + Prisma ORM
+│   ├── src/
+│   │   ├── server.ts
+│   │   ├── routes/            # auth, users, vestiges, categories, audit, custody-standards, pcnet
+│   │   └── middleware/
+│   ├── prisma/
+│   │   ├── schema.prisma
+│   │   └── migrations/
+│   └── scripts/                # bootstrap admin, importação/exportação (Fase 2), validação
+├── client/                    # React frontend + Vite
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── components/
+│   │   └── pages/
+│   └── index.html
+├── .claude/                   # Contexto e convenções para o agente de IA
+└── docker-compose.yml         # PostgreSQL (desenvolvimento)
+```
 
-2.  **Administrador:**
-    *   Todas as funções do padrão.
-    *   **Inserir** novos vestígios.
-    *   **Editar/Excluir** vestígios existentes.
+---
+
+## 🔒 Perfis de Acesso (RBAC)
+
+1.  **VISUALIZADOR:**
+    *   Pode realizar buscas e selecionar itens.
+    *   Pode agendar retiradas e gerar relatórios de visualização.
+    *   Pode consultar Normas/FAQ.
+
+2.  **PERITO:**
+    *   Todas as funções do Visualizador.
+    *   Pode registrar movimentações relacionadas à custódia dos vestígios sob sua responsabilidade.
+
+3.  **ADMIN:**
+    *   Todas as funções anteriores.
+    *   **Inserir/Editar/Excluir** vestígios e categorias.
     *   Gerenciar usuários do sistema.
     *   Visualizar Logs de Auditoria.
-    *   Gerenciar Normas/FAQ.
+    *   Gerenciar Normas/FAQ e rodar a sincronização com a planilha do Drive.
+
+---
+
+## ⚙️ Comandos do Dia a Dia
+
+```bash
+npm run dev:full               # backend + frontend em paralelo, sobe o DB se necessário
+npm run dev                    # apenas frontend + backend (DB já deve estar up)
+npm run db:up                  # inicia PostgreSQL em Docker
+npm run db:up:optional         # inicia DB se não estiver rodando
+npm run build                  # build completo (client + server)
+npm run prisma:migrate         # nova migration em dev (rodar dentro de server/)
+npm run bootstrap:admin        # cria usuário admin inicial
+```
 
 ---
 
 ## ⚠️ Notas Técnicas
 
-*   **Validação de 24h:** A lógica de bloqueio de agendamento compara o timestamp do navegador com a data selecionada.
-*   **Segurança:** A autenticação atual é realizada via `LocalStorage` para demonstração e uso em intranet controlada. Em produção escala, recomenda-se integrar com OAuth ou Backend dedicado.
-*   **Impressão:** O sistema possui uma folha de estilo dedicada para impressão (`print:`) que remove elementos de UI (botões, fundos escuros) e foca nos dados para geração de relatórios em papel/PDF.
+*   **Validação de 24h:** a lógica de bloqueio de agendamento compara o timestamp do navegador com a data selecionada; qualquer alteração nessa regra exige aprovação explícita (regra de negócio crítica da cadeia de custódia).
+*   **Segurança:** autenticação via JWT + cookies HttpOnly, com sessões e hash de senha (Argon2) persistidos no PostgreSQL — não há mais dependência de LocalStorage para autenticação.
+*   **Auditoria:** falha de gravação em log de auditoria é silenciosa por decisão de projeto — a tela segue funcionando normalmente mesmo que o registro não seja persistido; convém conferir os Logs de Auditoria após operações críticas.
+*   **Deploy:** produção roda em VPS Hostinger via Easypanel, com três serviços independentes (`api`, `web`, `db`), cada um com deploy próprio — ver `.claude/` para o passo a passo.
+*   **Impressão/PDF:** o relatório de custódia possui estilos dedicados para impressão e exportação em PDF.
 
 ---
 
