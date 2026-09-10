@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-26 · **Última atualização:** 2026-09-10
 **Status:** 🏁 **PLANO CONCLUÍDO.** Sincronização executada em produção e **MARCO INICIAL ATINGIDO em 2026-09-10** — o EvidenceOS passou a ser a fonte de verdade da cadeia de custódia. Ver **Parte 6** (execução) e **Parte 7** (marco).
-**Escopo:** Partes 1–5 (levantamento e desenho, julho) · Parte 6 (execução real) · **Parte 7 (marco inicial e o que muda daqui em diante)**
+**Escopo:** Partes 1–5 (levantamento e desenho, julho) · Parte 6 (execução real) · Parte 7 (marco inicial) · **Parte 8 (correções de qualidade de dados e pendências abertas)**
 
 > ## 🚩 LEIA ANTES DE QUALQUER COISA
 >
@@ -10,7 +10,9 @@
 >
 > **Consequência prática:** a operação central deste plano, sincronizar Drive → banco com exclusão do que está só na VPS, **não deve mais ser executada**. Um vestígio ausente da planilha hoje é um lançamento novo da equipe, não resíduo.
 >
-> As Partes 1 a 6 passam a ser **registro histórico** de como a migração foi feita. O que vale hoje está na **Parte 7**.
+> As Partes 1 a 6 passam a ser **registro histórico** de como a migração foi feita. O que vale hoje está nas **Partes 7 e 8** — a 8 traz as correções de qualidade de dados e, no fim, a lista de pendências abertas.
+>
+> **Se você veio pelas munições:** o diagnóstico completo, com o mapa da rotação de colunas, está em **8.3**. O script existe e está pronto, mas **não foi executado** — a correção foi pausada até o usuário falar com quem preencheu a aba.
 
 > ## ⛔ Antes de qualquer coisa: NÃO rode `npm run phase2:run` (nem `phase2:seed`) no estado atual
 >
@@ -484,3 +486,116 @@ Não decidido ainda. Duas coisas merecem atenção:
 
 1. **A planilha vira arquivo histórico.** Vale garantir que ninguém continue lançando nela por engano — um lançamento perdido lá não chega ao sistema e ninguém percebe.
 2. **O Apps Script continua publicado e servindo a base inteira sem autenticação.** Com a migração encerrada, ele não tem mais função. Despublicá-lo elimina a exposição descrita na "Observação de segurança" de uma vez.
+
+---
+
+# Parte 8 — Correções de qualidade de dados (2026-09-10, tarde)
+
+Depois do marco inicial, três frentes de limpeza. As duas primeiras foram concluídas; a terceira está **pausada por decisão do usuário**.
+
+## 8.1 As 19 FAVs que ficaram fora da migração — ✅ CONCLUÍDO
+
+As 18 FAVs repetidas na planilha (36 linhas) que a sincronização nunca insere. Com a planilha abandonada, perderam a chance de entrar sozinhas.
+
+O usuário conferiu as 18 contra o acervo e o PCNET. **As 36 linhas viraram 19 vestígios** — a maioria era a mesma evidência lançada duas vezes:
+
+| Situação | Casos | O que era |
+|---|---|---|
+| Duplicata pura | 5 | Linhas idênticas nos 7 campos, ou divergindo só na data |
+| Troca de lacre lançada como linha nova | 10 | Mesma evidência; os **dois** invólucros foram gravados, em ordem cronológica |
+| Erro de digitação | 4 | Marca trocada, invólucro inválido, colunas trocadas, FAV errada |
+
+Os quatro erros de digitação, em detalhe, porque são o tipo de coisa que reaparece:
+
+- **FAV 2142692** — a segunda linha trazia "Xiaomi"; era Motorola.
+- **FAV 2183965** — a segunda linha trazia invólucro `67638742`, com 8 dígitos (o padrão da base é 7). Descartada.
+- **FAV 2262657** (espingarda) — a planilha gravou a **FAV no campo invólucro** e o **invólucro novo no campo requisição**. Corrigido com dados do PCNET: invólucros `8532990` → `8021422`, requisição `058177195`.
+- **FAV 2249473** — a linha da balança tinha a FAV errada. A correta é `2249472`, que não existia em lugar nenhum. Com isso a "FAV duplicada" virou **dois vestígios distintos**, em categorias diferentes (Balanças e Diversos).
+
+Script: `server/scripts/cadastrar-favs-pendentes.cjs`. Os dados são transcrição das decisões do usuário, não inferência. Cada vestígio carrega em `observacoes` o que foi decidido e por quê. Nascem com `importedFrom: 'manual'` e `importedAt: null`, protegidos da exclusão automática.
+
+**Ponto em aberto:** a FAV `2186911` tem **duas requisições** (`58140608` e `58391924`). A primeira foi para o campo, a segunda para a observação. O modelo de dados não comporta o caso — ver 8.4.
+
+Banco: **5.216 → 5.235**.
+
+## 8.2 Normalização de municípios — ✅ CONCLUÍDO
+
+O município veio da planilha como texto livre. Santo Antônio do Amparo estava gravado em **nove grafias**; apenas 118 dos 256 registros usavam a oficial. Os outros **138 sumiam** de qualquer filtro por cidade, sem erro na tela.
+
+**144 vestígios corrigidos** em 13 grafias, via `server/scripts/normalizar-municipios.cjs`.
+
+Duas decisões de desenho que valem manter em qualquer script parecido:
+
+1. **Mapa explícito, sem fuzzy match.** Cada troca foi conferida à mão. Um algoritmo de similaridade acertaria a maioria e erraria em silêncio no resto — e o dado é de procedimento policial.
+2. **`updatedBy` intacto.** É correção sistêmica de grafia, não edição por um operador; sobrescrever apagaria a autoria real. O rastro vive no `AuditLog`.
+
+## 8.3 Aba "Munições" — 🔶 DIAGNOSTICADO, CORREÇÃO PAUSADA
+
+### O problema
+
+A aba "Munições" tem **uma coluna a mais** que as outras 28 — a da natureza da munição. O Apps Script lê as colunas por posição, então a coluna extra empurrou todo o resto uma casa. **Cada campo recebeu o valor do campo seguinte.**
+
+Atinge **as 403 linhas da aba**, sem exceção. 368 vieram da importação de abril e 35 entraram na sincronização de 2026-09-10 — o problema é de origem, não foi criado pela sincronização.
+
+### O mapa da rotação
+
+| Campo lido pelo Apps Script | Contém na verdade | Exemplo |
+|---|---|---|
+| `material` | material ✓ | "Munição" |
+| `requisicao` | **natureza** (coluna extra) | "Deflagradas", "Intactas", "Necrópsia" |
+| `involucro` | **requisição** | 42406095 |
+| `fav` | **invólucro** | 2954532 |
+| `municipio` | **FAV** | 272963 |
+| `data` | **município** | "Bom Sucesso" |
+| — | a **data real** nunca foi capturada | |
+
+### As evidências
+
+**A prova definitiva** é o campo de data: em 370 das 403 linhas ele contém nome de município — Lavras (195), Bom Sucesso (59), Perdões (48), Itumirim, Ijaci, Nepomuceno. Data não guarda cidade. Como o campo no banco é `DateTime`, o texto foi rejeitado e gravou nulo: **as 403 estão sem data de coleta.**
+
+As faixas de valor confirmam: o campo `involucro` da aba vai de 40.979.893 a 58.494.420 (8 dígitos), exatamente a faixa das requisições reais; o campo `municipio` vai de 73.506 a 2.304.566, a faixa das FAVs reais.
+
+Distribuição da natureza: Deflagradas (205), Intactas (150), Necrópsia (36), mais variações de grafia ("Intacta", "intactas", "Intacto", "Deflagadas", "Deflagrada").
+
+### Por que importa
+
+O usuário argumentou que a busca encontra esses vestígios de qualquer forma. **Encontra pelo invólucro e pela requisição, mas não pela FAV** — que é o identificador oficial da cadeia de custódia:
+
+- A busca por termo **numérico** compara com FAV, requisição, invólucro e material, mas **não com município** (`useVestiges.ts:104-107`). Como a FAV real está no campo município, buscar por ela não retorna nada.
+- Pior: o botão **"Ver FAV"** monta a URL do PCNET com `registroFav` (`VestigeCard.tsx:69`), que nesses 403 contém o invólucro. O botão aponta para o registro errado — e o "Movimentar FAV", que é **escrita** na cadeia de custódia oficial, faz o mesmo.
+
+### Por que está pausado
+
+O usuário conferiu 3 FAVs direto no PCNET e **2 divergiam da planilha** (uma requisição associada ao invólucro errado, outra que não deveria existir). Como a rotação é certa mas o conteúdo pode não ser, ele decidiu **falar antes com a pessoa que preencheu a aba** — pode haver um padrão intencional que muda a leitura.
+
+### O script, pronto e não executado
+
+`server/scripts/corrigir-municoes.cjs`. Faz a rotação usando o snapshot como base, com os 3 casos do PCNET tendo **precedência**, e marca cada vestígio na observação com a fonte do dado — PCNET (confiável) ou planilha (pendente de conferência). Os 33 sem município recebem `N/I`, por decisão do usuário. Os corrigidos passam a `importedFrom: 'manual'`.
+
+Não roda sozinho: exige `--confirmar` e `OPERADOR_EMAIL`.
+
+## 8.4 Pendências abertas ao fim de 2026-09-10
+
+### 🔴 Apps Script continua publicado e exposto
+
+A URL segue hardcoded em `_phase2-common.cjs:10`, versionada no GitHub, servindo a base inteira sem autenticação. **Com a planilha abandonada, ele não tem mais função — despublicá-lo elimina a exposição de uma vez.** É a pendência de maior risco e a de execução mais simples.
+
+### 🟡 Bug de UI: "Data inválida"
+
+Quando `dataColeta` é nula, o card mostra **"Data inválida"** em destaque laranja no tempo de custódia, enquanto o campo ao lado mostra um discreto `N/I` para a mesma ausência. Parece erro do sistema. Atinge os 403 das munições e mais **528 vestígios** de outras categorias. Correção em `client/`, exige deploy do **web**.
+
+### 🟡 Requisição deveria ser 1:N
+
+Levantado pelo usuário a partir da FAV `2186911`, que tem duas requisições legítimas. Invólucro já é 1:N; requisição continua campo único. A assimetria não se justifica. Exige tabela nova, migration, API e tela.
+
+### 🟡 Dívida do `importedFrom` (ver 6.4.1)
+
+A proteção funciona via `importedAt`, mas o campo continua sendo gravado errado na criação. Não quebra a sincronização; envenena relatórios que usem o campo para distinguir origem.
+
+### 🟡 Duplicatas dentro do banco (ver 6.4.2)
+
+Seguem invisíveis para o diagnóstico. Com a equipe cadastrando direto no sistema, o risco aumenta.
+
+### 🟡 Backup fora da VPS
+
+O diário funciona (ver 6.4.5), mas mora na mesma máquina do banco. Não cobre perda total da VPS. Migrar para S3 permitiria usar o agendador nativo do Easypanel.
