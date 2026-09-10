@@ -1,10 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import {
   Vestige,
+  VestigeItem,
   User,
   getRoleLabel,
   getEstadoConservacaoLabel,
   getDestinacaoLabel,
+  getMotivoLabel,
+  numerosDe,
 } from '../types';
 
 export interface FieldChange {
@@ -19,8 +22,21 @@ const EMPTY = '(vazio)';
 
 const asText = (value?: string | null): string => (value ?? '').toString().trim();
 
-const asInvolucros = (value?: string[] | null): string =>
-  (value || []).map((item) => item.trim()).filter(Boolean).join(', ');
+const asNumeros = (items?: VestigeItem[] | null): string =>
+  numerosDe(items).map((numero) => numero.trim()).filter(Boolean).join(', ');
+
+// Lista como vai ficar: o que foi incluído agora aparece com o motivo escolhido, que é
+// justamente o que será gravado junto do número.
+const asItemsAfter = (original?: VestigeItem[] | null, edited?: VestigeItem[] | null): string => {
+  const gravados = new Set(numerosDe(original).map((numero) => numero.trim()));
+  return (edited || [])
+    .map((item) => ({ numero: item.numero.trim(), motivo: item.motivo }))
+    .filter((item) => item.numero)
+    .map((item) => (gravados.has(item.numero) || !item.motivo
+      ? item.numero
+      : `${item.numero} (${getMotivoLabel(item.motivo)})`))
+    .join(', ');
+};
 
 /**
  * Compara o vestígio como está gravado com o que o formulário vai enviar.
@@ -37,8 +53,8 @@ export const computeVestigeChanges = (original: Vestige, edited: Partial<Vestige
   };
 
   push('Material / Descrição', asText(original.material), asText(edited.material));
-  push('Número da requisição', asText(original.requisicao), asText(edited.requisicao));
-  push('Invólucro(s)', asInvolucros(original.involucros), asInvolucros(edited.involucros), true);
+  push('Requisição(ões)', asNumeros(original.requisicoes), asItemsAfter(original.requisicoes, edited.requisicoes));
+  push('Invólucro(s)', asNumeros(original.involucros), asItemsAfter(original.involucros, edited.involucros), true);
   push('FAV', asText(original.fav), asText(edited.fav), true);
   push('Data do evento / entrada', asText(original.data), asText(edited.data));
   push('Município', asText(original.municipio), asText(edited.municipio));
@@ -116,8 +132,8 @@ const ConfirmEditModal: React.FC<ConfirmEditModalProps> = ({
             </h2>
             <p className="text-xs text-amber-200/70 mt-1">
               FAV <span className="font-mono text-amber-200">{vestige.fav || 'não informada'}</span>
-              {vestige.requisicao && (
-                <> · Requisição <span className="font-mono text-amber-200">{vestige.requisicao}</span></>
+              {vestige.requisicoes.length > 0 && (
+                <> · Requisição <span className="font-mono text-amber-200">{asNumeros(vestige.requisicoes)}</span></>
               )}
             </p>
           </div>

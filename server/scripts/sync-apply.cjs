@@ -117,20 +117,22 @@ async function main() {
         if (!categoryId) throw new Error(`Categoria não encontrada: ${nomeCategoria}`);
 
         const involucro = norm(item.involucro);
+        const requisicao = norm(item.requisicao);
 
         await tx.vestige.create({
           data: {
             legacyId: buildStableLegacyId(item),
             categoryId,
             registroFav: norm(item.fav) || null,
-            requisicao: norm(item.requisicao) || null,
             material: String(item.material || 'N/I').trim() || 'N/I',
             municipio: String(item.municipio || 'Lavras').trim() || 'Lavras',
             dataColeta: parseRawDate(item.data),
             importedFrom: 'google_sheets',
             importedAt,
-            // Invólucro vai para a tabela própria (1:N) — a coluna antiga não existe mais.
+            // Invólucro e requisição vão para tabelas próprias (1:N). O motivo fica no default
+            // LEGADO do banco: o dado veio da planilha, não de uma inclusão feita na tela.
             involucros: involucro ? { create: [{ numero: involucro }] } : undefined,
+            requisicoes: requisicao ? { create: [{ numero: requisicao }] } : undefined,
           },
         });
         inseridos += 1;

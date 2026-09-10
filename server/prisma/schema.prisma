@@ -53,7 +53,10 @@ model Vestige {
   legacyId      String?   @map("legacy_id")
   categoryId    Int       @map("category_id")
   registroFav   String?   @map("registro_fav")
-  requisicao    String?   @map("requisicao")
+  // Coluna congelada: desde 2026-09-10 a requisição fica em `vestige_requisicoes` (1:N).
+  // Mantida só como cópia de segurança do backfill — nada no sistema lê ou grava aqui.
+  // Remover em migration própria depois de conferir as contagens em produção.
+  requisicaoLegado String? @map("requisicao")
   material      String
   tipoMaterial  String?   @map("tipo_material")
   municipio     String    @default("Lavras")
@@ -85,24 +88,47 @@ model Vestige {
   destinationLogs    VestigeDestinationLog[]
   destinationChanger User?                   @relation("DestinationChangedBy", fields: [destinacaoChangedBy], references: [id])
   involucros         VestigeInvolucro[]
+  requisicoes        VestigeRequisicao[]
   pcnetActionLogs    PcnetActionLog[]
 
   @@map("vestiges")
   @@schema("public")
 }
 
+// Invólucros e requisições guardam só número e motivo (regras em server/src/services/vestigeItemService.ts).
+// O default LEGADO cobre o que já existia e o que os scripts de importação gravam.
+// removedAt é remoção lógica: o item lançado por engano sai da tela, mas o registro fica no banco.
 model VestigeInvolucro {
-  id        BigInt   @id @default(autoincrement())
-  vestigeId String   @map("vestige_id")
+  id        BigInt    @id @default(autoincrement())
+  vestigeId String    @map("vestige_id")
   numero    String
-  createdAt DateTime @default(now()) @map("created_at")
+  motivo    String    @default("LEGADO")
+  removedAt DateTime? @map("removed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   // Relations
-  vestige   Vestige  @relation(fields: [vestigeId], references: [id], onDelete: Cascade)
+  vestige   Vestige   @relation(fields: [vestigeId], references: [id], onDelete: Cascade)
 
   @@index([vestigeId])
   @@index([numero])
   @@map("vestige_involucros")
+  @@schema("public")
+}
+
+model VestigeRequisicao {
+  id        BigInt    @id @default(autoincrement())
+  vestigeId String    @map("vestige_id")
+  numero    String
+  motivo    String    @default("LEGADO")
+  removedAt DateTime? @map("removed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  vestige   Vestige   @relation(fields: [vestigeId], references: [id], onDelete: Cascade)
+
+  @@index([vestigeId])
+  @@index([numero])
+  @@map("vestige_requisicoes")
   @@schema("public")
 }
 

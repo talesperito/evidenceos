@@ -1,6 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Vestige, User, ESTADO_CONSERVACAO_OPTIONS, DESTINACAO_OPTIONS } from '../types';
+import {
+  Vestige,
+  VestigeItem,
+  User,
+  ESTADO_CONSERVACAO_OPTIONS,
+  DESTINACAO_OPTIONS,
+  MOTIVOS_INVOLUCRO,
+  MOTIVOS_REQUISICAO,
+  getMotivoLabel,
+  numerosDe,
+} from '../types';
 import { XIcon } from './icons/XIcon';
 import { checkDuplicate, DuplicateAlert } from '../services/dataService';
 import ConfirmEditModal, { computeVestigeChanges, FieldChange } from './ConfirmEditModal';
@@ -17,11 +27,126 @@ interface VestigeFormModalProps {
   user?: User;
 }
 
+// Linha de invólucro/requisição no formulário. `novo` marca o que foi incluído nesta edição:
+// só esses pedem motivo — os já gravados aparecem fixos, com o motivo que têm.
+type FormItem = VestigeItem & { novo?: boolean };
+
+const EMPTY_ITEM: FormItem = { numero: '', motivo: '' };
+
+const inputClass = 'bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none';
+
+interface ItemListFieldProps {
+  label: string;
+  addLabel: string;
+  removeTitle: string;
+  emptyLabel: string;
+  placeholder: string;
+  hint?: string;
+  items: FormItem[];
+  isEdit: boolean;
+  motivos: ReadonlyArray<{ value: string; label: string }>;
+  onChange: (items: FormItem[]) => void;
+}
+
+// Lista dinâmica, sem limite de quantidade — chegar com 2 invólucros ou 2 requisições é comum.
+// Cadastro: só números (tudo vira "Registro inicial" no servidor).
+// Edição: os gravados ficam fixos e removíveis; os incluídos agora pedem número e motivo.
+const ItemListField: React.FC<ItemListFieldProps> = ({
+  label,
+  addLabel,
+  removeTitle,
+  emptyLabel,
+  placeholder,
+  hint,
+  items,
+  isEdit,
+  motivos,
+  onChange,
+}) => {
+  const update = (index: number, patch: Partial<FormItem>) =>
+    onChange(items.map((item, i) => (i === index ? { ...item, ...patch } : item)));
+
+  // No cadastro sempre sobra uma linha para digitar; na edição a lista pode ficar vazia.
+  const remove = (index: number) => {
+    const next = items.filter((_, i) => i !== index);
+    onChange(!isEdit && next.length === 0 ? [EMPTY_ITEM] : next);
+  };
+
+  const add = () => onChange([...items, { ...EMPTY_ITEM, novo: isEdit }]);
+
+  return (
+    <div className="md:col-span-2">
+      <label className="block text-xs font-semibold text-slate-400 mb-1">{label}</label>
+      <div className="space-y-2">
+        {isEdit && items.length === 0 && (
+          <p className="text-xs text-slate-500 italic">{emptyLabel}</p>
+        )}
+        {items.map((item, index) => (
+          <div key={index} className="flex items-center gap-2">
+            {isEdit && !item.novo ? (
+              // Já gravado: o número não se edita. Para corrigir, remove-se e inclui-se de novo
+              // com "Correção de cadastro" — assim nenhuma troca passa sem motivo.
+              <div className="flex-grow flex items-center gap-3 bg-slate-800/50 border border-slate-700 rounded px-3 py-2 min-w-0">
+                <span className="font-mono text-sm text-white">{item.numero}</span>
+                <span className="text-xs text-slate-400 truncate">{getMotivoLabel(item.motivo)}</span>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={item.numero}
+                  onChange={e => update(index, { numero: e.target.value.replace(/\D/g, '') })}
+                  pattern="\d*"
+                  inputMode="numeric"
+                  className={`${inputClass} flex-grow min-w-0`}
+                  placeholder={placeholder}
+                  title="Digite apenas números"
+                />
+                {isEdit && (
+                  <select
+                    value={item.motivo}
+                    onChange={e => update(index, { motivo: e.target.value })}
+                    required={item.numero.trim() !== ''}
+                    className={`${inputClass} w-40 sm:w-56 shrink-0 appearance-none`}
+                    title="Motivo da inclusão"
+                  >
+                    <option value="" disabled>Motivo...</option>
+                    {motivos.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                )}
+              </>
+            )}
+            {(isEdit || items.length > 1) && (
+              <button
+                type="button"
+                onClick={() => remove(index)}
+                className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded transition-colors shrink-0"
+                title={removeTitle}
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={add}
+        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+      >
+        <span className="text-base leading-none">+</span> {addLabel}
+      </button>
+      {hint && <p className="text-[10px] text-slate-500 mt-1">{hint}</p>}
+    </div>
+  );
+};
+
 const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClose, onSave, options, user }) => {
+  const isEdit = Boolean(initialData);
   const [formData, setFormData] = useState<Partial<Vestige>>({
     material: '',
-    requisicao: '',
-    involucros: [''],
+    requisicoes: [EMPTY_ITEM],
+    involucros: [EMPTY_ITEM],
     fav: '',
     municipio: 'Lavras',
     data: new Date().toLocaleDateString('pt-BR'),
@@ -41,13 +166,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
   useEffect(() => {
     if (initialData) {
-      // Garante ao menos um campo de invólucro em branco para edição (UX).
-      setFormData({
-        ...initialData,
-        involucros: initialData.involucros && initialData.involucros.length > 0
-          ? initialData.involucros
-          : [''],
-      });
+      setFormData({ ...initialData });
     }
   }, [initialData]);
 
@@ -61,28 +180,6 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
   // exibia (e a confirmação anunciaria) a categoria nova enquanto o banco mantinha a antiga.
   const handleCategoryChange = (value: string) => {
     setFormData(prev => ({ ...prev, planilhaOrigem: value, categoryId: undefined }));
-  };
-
-  // === Invólucros (lista dinâmica, sem limite de quantidade) ===
-  const handleInvolucroChange = (index: number, value: string) => {
-    const numericValue = value.replace(/\D/g, ''); // somente dígitos
-    setFormData(prev => {
-      const arr = [...(prev.involucros || [''])];
-      arr[index] = numericValue;
-      return { ...prev, involucros: arr };
-    });
-  };
-
-  const addInvolucro = () => {
-    setFormData(prev => ({ ...prev, involucros: [...(prev.involucros || []), ''] }));
-  };
-
-  const removeInvolucro = (index: number) => {
-    setFormData(prev => {
-      const arr = [...(prev.involucros || [])];
-      arr.splice(index, 1);
-      return { ...prev, involucros: arr.length > 0 ? arr : [''] };
-    });
   };
 
   // Grava de fato. Só é chamada depois de o usuário confirmar, quando se trata de edição.
@@ -120,13 +217,13 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
     // Preflight: verificar duplicatas (apenas se não houve confirmação prévia)
     if (!pendingSubmit) {
-      const involucros = (formData.involucros || []).map(s => s.trim()).filter(Boolean);
-      const requisicao = formData.requisicao?.trim();
+      const involucros = numerosDe(formData.involucros).map(s => s.trim()).filter(Boolean);
+      const requisicoes = numerosDe(formData.requisicoes).map(s => s.trim()).filter(Boolean);
       const excludeId = initialData?.id;
 
-      if (involucros.length > 0 || requisicao) {
+      if (involucros.length > 0 || requisicoes.length > 0) {
         try {
-          const alerts = await checkDuplicate(involucros, requisicao, excludeId);
+          const alerts = await checkDuplicate(involucros, requisicoes, excludeId);
           if (alerts.length > 0) {
             setDuplicateAlerts(alerts);
             setPendingSubmit(true);
@@ -175,16 +272,10 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     return `${year}-${month}-${day}`;
   };
 
-  // Função helper para permitir apenas números
-  const handleNumericInput = (field: keyof Vestige, value: string) => {
-    const numericValue = value.replace(/\D/g, ''); // Remove tudo que não for dígito
-    handleChange(field, numericValue);
-  };
-
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-700 max-h-[90vh] flex flex-col">
-        
+
         <div className="flex justify-between items-center p-5 border-b border-slate-700 bg-slate-800/50 rounded-t-xl">
           <h2 className="text-xl font-bold text-white">
             {initialData ? 'Editar Vestígio' : 'Novo Vestígio'}
@@ -196,7 +287,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
 
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto custom-scrollbar flex-grow">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
+
             {/* Linha 1 */}
             <div className="md:col-span-2">
               <label className="block text-xs font-semibold text-slate-400 mb-1">MATERIAL / DESCRIÇÃO</label>
@@ -210,55 +301,29 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
             </div>
 
             {/* Linha 2 */}
-             <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">NÚMERO DA REQUISIÇÃO</label>
-                <input
-                  type="text"
-                  value={formData.requisicao}
-                  onChange={e => handleNumericInput('requisicao', e.target.value)}
-                  pattern="\d*"
-                  className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
-                  placeholder="Ex: 123456001 (sem o ano)"
-                  title="Informe apenas os números finais da requisição. Não inclua o ano nos primeiros dígitos."
-                />
-                <p className="text-[10px] text-slate-500 mt-1">Não inclua o ano (ex: 2024) no início do número.</p>
-             </div>
-            <div className="md:col-span-2">
-               <label className="block text-xs font-semibold text-slate-400 mb-1">NÚMERO(S) DO INVÓLUCRO</label>
-               <div className="space-y-2">
-                 {(formData.involucros || ['']).map((inv, index) => (
-                   <div key={index} className="flex items-center gap-2">
-                     <input
-                       type="text"
-                       value={inv}
-                       onChange={e => handleInvolucroChange(index, e.target.value)}
-                       pattern="\d*"
-                       inputMode="numeric"
-                       className="flex-grow bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none"
-                       placeholder="Ex: 123456 (Apenas números)"
-                       title="Digite apenas os números do invólucro"
-                     />
-                     {(formData.involucros?.length || 0) > 1 && (
-                       <button
-                         type="button"
-                         onClick={() => removeInvolucro(index)}
-                         className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded transition-colors shrink-0"
-                         title="Remover este invólucro"
-                       >
-                         <XIcon className="w-4 h-4" />
-                       </button>
-                     )}
-                   </div>
-                 ))}
-               </div>
-               <button
-                 type="button"
-                 onClick={addInvolucro}
-                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
-               >
-                 <span className="text-base leading-none">+</span> Inserir novo invólucro
-               </button>
-            </div>
+            <ItemListField
+              label="NÚMERO(S) DA REQUISIÇÃO"
+              addLabel={isEdit ? 'Nova requisição' : 'Inserir nova requisição'}
+              removeTitle="Remover esta requisição"
+              emptyLabel="Nenhuma requisição cadastrada."
+              placeholder="Ex: 123456001 (sem o ano)"
+              hint="Não inclua o ano (ex: 2024) no início do número."
+              items={formData.requisicoes || []}
+              isEdit={isEdit}
+              motivos={MOTIVOS_REQUISICAO}
+              onChange={items => setFormData(prev => ({ ...prev, requisicoes: items }))}
+            />
+            <ItemListField
+              label="NÚMERO(S) DO INVÓLUCRO"
+              addLabel={isEdit ? 'Novo invólucro' : 'Inserir novo invólucro'}
+              removeTitle="Remover este invólucro"
+              emptyLabel="Nenhum invólucro cadastrado."
+              placeholder="Ex: 123456 (Apenas números)"
+              items={formData.involucros || []}
+              isEdit={isEdit}
+              motivos={MOTIVOS_INVOLUCRO}
+              onChange={items => setFormData(prev => ({ ...prev, involucros: items }))}
+            />
 
             {/* Linha 3 */}
             <div>

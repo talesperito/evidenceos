@@ -18,8 +18,8 @@ export const getVestigeSummary = async (vestige: Vestige): Promise<string> => {
       Seja direto e informativo.
 
       - Material: ${vestige.material}
-      - Requisição: ${vestige.requisicao || 'Não informada'}
-      - Invólucro(s): ${vestige.involucros.join(', ') || 'Não informado'}
+      - Requisição(ões): ${vestige.requisicoes.map((r) => r.numero).join(', ') || 'Não informada'}
+      - Invólucro(s): ${vestige.involucros.map((i) => i.numero).join(', ') || 'Não informado'}
       - FAV: ${vestige.fav}
       - Município de Origem: ${vestige.municipio}
       - Data de Entrada: ${vestige.data}

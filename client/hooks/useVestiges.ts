@@ -102,24 +102,25 @@ export const useVestiges = () => {
           if (isNumericSearch) {
             matchesTerm =
               normalize(vestige.fav) === searchTerm ||
-              normalize(vestige.requisicao) === searchTerm ||
-              vestige.involucros.some((i) => normalize(i) === searchTerm) ||
+              vestige.requisicoes.some((r) => normalize(r.numero) === searchTerm) ||
+              vestige.involucros.some((i) => normalize(i.numero) === searchTerm) ||
               normalize(vestige.material).includes(searchTerm);
           } else {
             matchesTerm =
               normalize(vestige.fav).includes(searchTerm) ||
-              normalize(vestige.requisicao).includes(searchTerm) ||
-              vestige.involucros.some((i) => normalize(i).includes(searchTerm)) ||
+              vestige.requisicoes.some((r) => normalize(r.numero).includes(searchTerm)) ||
+              vestige.involucros.some((i) => normalize(i.numero).includes(searchTerm)) ||
               normalize(vestige.material).includes(searchTerm) ||
               normalize(vestige.municipio).includes(searchTerm);
           }
-        } else if (filters.field === 'involucro') {
+        } else if (filters.field === 'involucro' || filters.field === 'requisicao') {
+          const items = filters.field === 'involucro' ? vestige.involucros : vestige.requisicoes;
           matchesTerm = isNumericSearch
-            ? vestige.involucros.some((i) => normalize(i) === searchTerm)
-            : vestige.involucros.some((i) => normalize(i).includes(searchTerm));
+            ? items.some((i) => normalize(i.numero) === searchTerm)
+            : items.some((i) => normalize(i.numero).includes(searchTerm));
         } else {
           const fieldValue = normalize(vestige[filters.field as keyof Vestige] as string);
-          if (isNumericSearch && ['fav', 'requisicao'].includes(filters.field)) {
+          if (isNumericSearch && filters.field === 'fav') {
             matchesTerm = fieldValue === searchTerm;
           } else {
             matchesTerm = fieldValue.includes(searchTerm);
@@ -210,8 +211,8 @@ export const useVestiges = () => {
       stats.total++;
       totalGlobal++;
 
-      const hasNumber = /\d/.test(vestige.requisicao);
-      const isMissingReq = !vestige.requisicao || !hasNumber;
+      // Sem requisição = nenhuma das requisições ativas tem número (legado traz texto como "N/I").
+      const isMissingReq = !vestige.requisicoes.some((r) => /\d/.test(r.numero));
 
       if (isMissingReq) {
         stats.missingRequisition++;

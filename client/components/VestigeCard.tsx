@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Vestige, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel, estaForaDaUrc } from '../types';
+import { Vestige, VestigeItem, User, canDeleteVestige, canEditVestige, getEstadoConservacaoLabel, getDestinacaoLabel, getMotivoLabel, estaForaDaUrc } from '../types';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { PencilIcon } from './icons/PencilIcon';
 import { TrashIcon } from './icons/TrashIcon';
@@ -16,6 +16,25 @@ interface VestigeCardProps {
   onEdit?: (vestige: Vestige) => void;
   onDelete?: (vestige: Vestige) => void;
 }
+
+// Invólucros/requisições: o número fica em destaque e o motivo da inclusão aparece ao passar
+// o mouse, para não poluir o card.
+const ItemChips: React.FC<{ items: VestigeItem[] }> = ({ items }) =>
+  items.length > 0 ? (
+    <div className="flex flex-wrap gap-1">
+      {items.map((item, idx) => (
+        <span
+          key={idx}
+          title={getMotivoLabel(item.motivo)}
+          className="font-medium text-white text-xs sm:text-sm font-mono bg-slate-700/60 rounded px-1.5 py-0.5"
+        >
+          {item.numero}
+        </span>
+      ))}
+    </div>
+  ) : (
+    <p className="font-medium text-white text-sm sm:text-base font-mono">N/A</p>
+  );
 
 // Utility to parse date and calculate difference
 const parseDate = (dateStr: string): Date | null => {
@@ -163,24 +182,16 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
           <p className="font-medium text-white text-sm sm:text-base leading-snug">{vestige.material}</p>
         </div>
         <div>
-          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Requisição</p>
-          <p className="font-medium text-white text-sm sm:text-base font-mono">{vestige.requisicao || 'N/A'}</p>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
+            {vestige.requisicoes.length > 1 ? 'Requisições' : 'Requisição'}
+          </p>
+          <ItemChips items={vestige.requisicoes} />
         </div>
         <div>
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">
             {vestige.involucros.length > 1 ? 'Invólucros' : 'Invólucro'}
           </p>
-          {vestige.involucros.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {vestige.involucros.map((inv, idx) => (
-                <span key={idx} className="font-medium text-white text-xs sm:text-sm font-mono bg-slate-700/60 rounded px-1.5 py-0.5">
-                  {inv}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="font-medium text-white text-sm sm:text-base font-mono">N/A</p>
-          )}
+          <ItemChips items={vestige.involucros} />
         </div>
         <div>
           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">FAV</p>

@@ -42,11 +42,17 @@ export const canManageStandards = (user: Pick<User, 'role'>): boolean =>
 export const canViewAuditLogs = (user: Pick<User, 'role'>): boolean =>
   user.role === 'ADMIN';
 
+// Invólucro ou requisição: o item guarda só o número e o motivo da inclusão.
+export interface VestigeItem {
+  numero: string;
+  motivo: string;
+}
+
 export interface Vestige {
   id: string;
   material: string;
-  requisicao: string;
-  involucros: string[];
+  requisicoes: VestigeItem[];
+  involucros: VestigeItem[];
   fav: string;
   municipio: string;
   data: string;
@@ -158,3 +164,35 @@ export const getDestinacaoLabel = (value: string): string =>
 // Vestígio que não está mais fisicamente na URC. Usado para o alerta visual do card.
 export const estaForaDaUrc = (destinacao: string): boolean =>
   destinacao === 'RETIRADO' || destinacao === 'FINALIZADO';
+
+// === Motivo de inclusão de invólucro / requisição ===
+// No cadastro tudo entra como "Registro inicial", sem pergunta. Na edição, incluir um item
+// novo exige um dos motivos abaixo. Espelha MOTIVOS_EDICAO em server/src/services/vestigeItemService.ts.
+// Não há "Outro": sem campo de texto ele não diria nada. Caso novo entra na lista (aqui e lá).
+export const MOTIVOS_INVOLUCRO = [
+  { value: 'DIVISAO_MATERIAL', label: 'Divisão do material' },
+  { value: 'ROMPIMENTO_LACRE', label: 'Rompimento de lacre para exame' },
+  { value: 'EMBALAGEM_DANIFICADA', label: 'Embalagem danificada' },
+  { value: 'CORRECAO_CADASTRO', label: 'Correção de cadastro' },
+] as const;
+
+export const MOTIVOS_REQUISICAO = [
+  { value: 'NOVO_EXAME', label: 'Novo exame pericial' },
+  { value: 'EXAME_COMPLEMENTAR', label: 'Exame complementar' },
+  { value: 'REITERACAO_AUTORIDADE', label: 'Reiteração/substituição pela autoridade' },
+  { value: 'CORRECAO_CADASTRO', label: 'Correção de cadastro' },
+] as const;
+
+// Gravados pelo sistema, nunca escolhidos na tela.
+const MOTIVOS_AUTOMATICOS: Record<string, string> = {
+  REGISTRO_INICIAL: 'Registro inicial',
+  LEGADO: 'Legado',
+};
+
+export const getMotivoLabel = (value: string): string =>
+  [...MOTIVOS_INVOLUCRO, ...MOTIVOS_REQUISICAO].find(o => o.value === value)?.label
+  || MOTIVOS_AUTOMATICOS[value]
+  || value;
+
+export const numerosDe = (items?: VestigeItem[] | null): string[] =>
+  (items || []).map((item) => item.numero);

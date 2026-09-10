@@ -97,14 +97,15 @@ async function carregarVestigios(prisma) {
     select: {
       id: true,
       registroFav: true,
-      requisicao: true,
       material: true,
       importedFrom: true,
       importedAt: true,
       estadoConservacao: true,
       destinacao: true,
       createdAt: true,
-      involucros: { select: { numero: true } },
+      // Só itens ativos: removedAt marca o que foi retirado por engano pela tela.
+      requisicoes: { where: { removedAt: null }, select: { numero: true } },
+      involucros: { where: { removedAt: null }, select: { numero: true } },
       category: { select: { name: true } },
       _count: { select: { destinationLogs: true, pcnetActionLogs: true } },
     },

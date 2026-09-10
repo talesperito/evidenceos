@@ -1,5 +1,5 @@
 import { apiRequest } from './apiClient';
-import { Vestige } from '../types';
+import { Vestige, VestigeItem } from '../types';
 
 interface ApiCategory {
   id: number;
@@ -10,8 +10,8 @@ interface ApiVestige {
   id: string;
   categoryId: number;
   registroFav?: string | null;
-  requisicao?: string | null;
-  involucros?: { numero: string }[] | null;
+  requisicoes?: VestigeItem[] | null;
+  involucros?: VestigeItem[] | null;
   material: string;
   municipio: string;
   dataColeta?: string | null;
@@ -44,8 +44,8 @@ const mapVestige = (item: ApiVestige): Vestige => ({
   id: item.id,
   categoryId: item.categoryId,
   material: item.material,
-  requisicao: item.requisicao || '',
-  involucros: (item.involucros || []).map((i) => i.numero),
+  requisicoes: (item.requisicoes || []).map(({ numero, motivo }) => ({ numero, motivo })),
+  involucros: (item.involucros || []).map(({ numero, motivo }) => ({ numero, motivo })),
   fav: item.registroFav || '',
   municipio: item.municipio || 'Lavras',
   data: formatDate(item.dataColeta),
@@ -77,12 +77,19 @@ const resolveCategoryId = async (vestige: Partial<Vestige>) => {
   return match.id;
 };
 
+// Só número e motivo seguem para o servidor (marcas de tela como `novo` ficam de fora),
+// e linhas deixadas em branco no formulário são descartadas.
+const buildItemsPayload = (items?: VestigeItem[]) =>
+  (items || [])
+    .map(({ numero, motivo }) => ({ numero: numero.trim(), motivo: motivo || undefined }))
+    .filter((item) => item.numero.length > 0);
+
 const buildPayload = async (vestige: Partial<Vestige>) => ({
   material: vestige.material,
   categoryId: await resolveCategoryId(vestige),
   registroFav: vestige.fav || undefined,
-  requisicao: vestige.requisicao || undefined,
-  involucros: (vestige.involucros || []).map((s) => s.trim()).filter((s) => s.length > 0),
+  requisicoes: buildItemsPayload(vestige.requisicoes),
+  involucros: buildItemsPayload(vestige.involucros),
   municipio: vestige.municipio || 'Lavras',
   dataColeta: parseDate(vestige.data),
   observacoes: vestige.observacoes || undefined,
@@ -181,15 +188,17 @@ export interface DuplicateAlert {
 
 export const checkDuplicate = async (
   involucros?: string[],
-  requisicao?: string,
+  requisicoes?: string[],
   excludeId?: string,
 ): Promise<DuplicateAlert[]> => {
   const params = new URLSearchParams();
-  (involucros || [])
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-    .forEach((numero) => params.append('involucro', numero));
-  if (requisicao) params.append('requisicao', requisicao);
+  const append = (key: string, numeros?: string[]) =>
+    (numeros || [])
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .forEach((numero) => params.append(key, numero));
+  append('involucro', involucros);
+  append('requisicao', requisicoes);
   if (excludeId) params.append('excludeId', excludeId);
 
   const result = await apiRequest<{ duplicates: DuplicateAlert[] }>(

@@ -63,7 +63,7 @@ function imprimirRelatorios(a, snapshot, schema, items) {
     console.log(linha('-'));
     for (const v of lista) {
       const fav = (v.registroFav || '(sem FAV)').slice(0, 13).padEnd(14);
-      const req = (v.requisicao || '(sem req.)').slice(0, 15).padEnd(16);
+      const req = (v.requisicoes.map((r) => r.numero).join(',') || '(sem req.)').slice(0, 15).padEnd(16);
       console.log(fav + req + String(v.material || '').slice(0, 45));
     }
   };
@@ -141,7 +141,7 @@ async function main() {
     const resumo = (v) => ({
       id: v.id,
       fav: v.registroFav,
-      requisicao: v.requisicao,
+      requisicoes: v.requisicoes.map((r) => r.numero),
       material: v.material,
       categoria: v.category?.name,
       importedFrom: v.importedFrom,
