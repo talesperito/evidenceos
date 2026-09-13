@@ -291,24 +291,43 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
       )}
 
       <footer className="w-full text-center py-8 mt-auto border-t border-white/5 bg-black/20">
-        <div className="container mx-auto px-4 flex flex-col items-center gap-4">
+        <div className="container mx-auto px-4 flex flex-col items-center gap-5">
           <p className="text-[10px] text-amber-500/50 uppercase tracking-[0.2em] font-bold">
             Desenvolvido por
           </p>
 
-          <div className="flex flex-col gap-1 items-center">
-            <p className="text-xs font-medium text-zinc-400">
-              <span className="text-zinc-200">Tales Vieira</span> • Perito Criminal, Coordenador do 6° Depto e Cientista de Dados
-            </p>
-            <a
-              href="https://www.linkedin.com/in/peritotales/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-amber-400 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.71h.05a4.17 4.17 0 0 1 3.75-2.06c4.01 0 4.75 2.64 4.75 6.07V21h-4v-5.39c0-1.29-.02-2.94-1.79-2.94-1.79 0-2.07 1.4-2.07 2.85V21H9z" /></svg>
-              linkedin.com/in/peritotales
-            </a>
+          <div className="flex flex-col md:flex-row items-center gap-6 md:gap-8">
+            <div className="flex flex-col gap-1 items-center">
+              <p className="text-xs font-medium text-zinc-400">
+                <span className="text-zinc-200">Tales Vieira</span> • Perito Criminal, Coordenador do 6° Depto e Cientista de Dados
+              </p>
+              <a
+                href="https://www.linkedin.com/in/peritotales/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-amber-400 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.71h.05a4.17 4.17 0 0 1 3.75-2.06c4.01 0 4.75 2.64 4.75 6.07V21h-4v-5.39c0-1.29-.02-2.94-1.79-2.94-1.79 0-2.07 1.4-2.07 2.85V21H9z" /></svg>
+                linkedin.com/in/peritotales
+              </a>
+            </div>
+
+            <div aria-hidden="true" className="w-10 h-px md:w-px md:h-10 bg-gradient-to-r md:bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+
+            <div className="flex flex-col gap-1 items-center">
+              <p className="text-xs font-medium text-zinc-400">
+                <span className="text-zinc-200">Matheus Vieira</span> • Desenvolvedor e Graduando em Direito
+              </p>
+              <a
+                href="https://www.linkedin.com/in/matheusvieira-dev/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 hover:text-amber-400 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9h4v12H3zM9 9h3.8v1.71h.05a4.17 4.17 0 0 1 3.75-2.06c4.01 0 4.75 2.64 4.75 6.07V21h-4v-5.39c0-1.29-.02-2.94-1.79-2.94-1.79 0-2.07 1.4-2.07 2.85V21H9z" /></svg>
+                linkedin.com/in/matheusvieira-dev
+              </a>
+            </div>
           </div>
         </div>
       </footer>
