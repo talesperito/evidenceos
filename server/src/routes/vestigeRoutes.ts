@@ -113,6 +113,12 @@ export async function vestigeRoutes(server: FastifyInstance) {
     }
   };
 
+  // `id` desempata a ordenação. A importação gravou blocos de 500 vestígios com o mesmo
+  // `createdAt` (CURRENT_TIMESTAMP é o início da transação), e com empate o PostgreSQL não
+  // garante a mesma ordem entre páginas: uma página repetia itens da outra e pulava outros.
+  // O total continuava batendo, mas vestígios existentes sumiam da busca e do relatório.
+  const listOrder = [{ createdAt: 'desc' as const }, { id: 'asc' as const }];
+
   server.get('/', async (request) => {
     const { page, limit, category, search, estadoConservacao, destinacao } = querySchema.parse(request.query);
     const skip = (page - 1) * limit;
@@ -123,7 +129,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: listOrder,
         include: { category: true, involucros: activeItems, requisicoes: activeItems },
       }),
       prisma.vestige.count({ where }),
@@ -150,7 +156,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy: listOrder,
         include: { category: true, involucros: activeItems, requisicoes: activeItems },
       }),
       prisma.vestige.count({ where }),

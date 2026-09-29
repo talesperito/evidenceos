@@ -63,7 +63,8 @@ export async function auditRoutes(server: FastifyInstance) {
     const [items, total] = await Promise.all([
       prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        // `id` desempata: com `createdAt` repetido, a paginação poderia pular uma entrada.
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
         skip,
         take: limit,
       }),

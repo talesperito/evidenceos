@@ -264,8 +264,9 @@ export async function withdrawalRoutes(server: FastifyInstance) {
     const [items, total] = await Promise.all([
       prisma.withdrawalRequest.findMany({
         where,
-        // Para retirada agendada, o que interessa é a próxima primeiro.
-        orderBy: { scheduledFor: 'asc' },
+        // Para retirada agendada, o que interessa é a próxima primeiro. `id` desempata: várias
+        // retiradas no mesmo horário fariam a paginação repetir umas e pular outras.
+        orderBy: [{ scheduledFor: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
         include: REQUEST_INCLUDE,
