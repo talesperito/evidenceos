@@ -27,6 +27,8 @@ dist-ssr
 *.sln
 *.sw?
 database/*.json
+# Rodadas da conferência de dados: histórico e planilhas com dados de custódia.
+database/conferencias/
 
 # Claude Code
 .claude/
