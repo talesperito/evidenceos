@@ -58,7 +58,15 @@ export const normalizeItems = (items?: ItemInput[] | null): ItemInput[] => {
   return result;
 };
 
+// Requisição: só dígitos. Invólucro: letras maiúsculas e/ou dígitos (sem "/", "-" nem minúsculas,
+// para que a checagem de duplicata, que compara texto exato, não deixe passar "ab1" e "AB1").
 const assertDigits = (kind: VestigeItemKind, numero: string) => {
+  if (kind === 'involucro') {
+    if (!/^[A-Z0-9]+$/.test(numero)) {
+      throw new VestigeItemError(`Número de ${NOME[kind].de} inválido: "${numero}". Use apenas letras maiúsculas e/ou números.`);
+    }
+    return;
+  }
   if (!/^\d+$/.test(numero)) {
     throw new VestigeItemError(`Número de ${NOME[kind].de} inválido: "${numero}". Use apenas dígitos.`);
   }

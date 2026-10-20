@@ -42,6 +42,8 @@ interface ItemListFieldProps {
   emptyLabel: string;
   placeholder: string;
   hint?: string;
+  /** Aceita letras maiúsculas além de dígitos (invólucro). Sem isso, só dígitos (requisição). */
+  allowLetters?: boolean;
   items: FormItem[];
   isEdit: boolean;
   motivos: ReadonlyArray<{ value: string; label: string }>;
@@ -58,6 +60,7 @@ const ItemListField: React.FC<ItemListFieldProps> = ({
   emptyLabel,
   placeholder,
   hint,
+  allowLetters,
   items,
   isEdit,
   motivos,
@@ -95,12 +98,16 @@ const ItemListField: React.FC<ItemListFieldProps> = ({
                 <input
                   type="text"
                   value={item.numero}
-                  onChange={e => update(index, { numero: e.target.value.replace(/\D/g, '') })}
-                  pattern="\d*"
-                  inputMode="numeric"
+                  onChange={e => update(index, {
+                    numero: allowLetters
+                      ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+                      : e.target.value.replace(/\D/g, ''),
+                  })}
+                  pattern={allowLetters ? '[A-Z0-9]*' : '\\d*'}
+                  inputMode={allowLetters ? 'text' : 'numeric'}
                   className={`${inputClass} flex-grow min-w-0`}
                   placeholder={placeholder}
-                  title="Digite apenas números"
+                  title={allowLetters ? 'Letras Maiúsculas e/ou números' : 'Digite apenas números'}
                 />
                 {isEdit && (
                   <select
@@ -318,7 +325,9 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
               addLabel={isEdit ? 'Novo invólucro' : 'Inserir novo invólucro'}
               removeTitle="Remover este invólucro"
               emptyLabel="Nenhum invólucro cadastrado."
-              placeholder="Ex: 123456 (Apenas números)"
+              placeholder="Ex: 123456 ou AB123456 (Letras Maiúsculas e/ou números)"
+              hint="Letras Maiúsculas e/ou números."
+              allowLetters
               items={formData.involucros || []}
               isEdit={isEdit}
               motivos={MOTIVOS_INVOLUCRO}
