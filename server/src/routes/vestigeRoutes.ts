@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db/connection';
-import { auditService } from '../services/auditService';
+import { auditService, CUSTODY_TX_OPTIONS } from '../services/auditService';
 import {
   ItemPlan,
   StoredItem,
@@ -71,8 +71,9 @@ const describeItemChange = (
 
 export async function vestigeRoutes(server: FastifyInstance) {
   const querySchema = z.object({
-    page: z.string().optional().transform(v => Number(v) || 1),
-    limit: z.string().optional().transform(v => Number(v) || 50),
+    page: z.string().optional().transform(v => Math.max(Number(v) || 1, 1)),
+    // 500 é o tamanho de página que a tela usa para carregar a base (fetchAllVestiges).
+    limit: z.string().optional().transform(v => Math.min(Math.max(Number(v) || 50, 1), 500)),
     category: z.string().optional(),
     search: z.string().optional(),
     estadoConservacao: z.string().optional(),
@@ -295,27 +296,31 @@ export async function vestigeRoutes(server: FastifyInstance) {
       throw error;
     }
 
-    const vestige = await prisma.vestige.create({
-      data: {
-        ...data,
-        createdBy: user.id,
-        involucros: involucros.length > 0 ? { create: involucros } : undefined,
-        requisicoes: requisicoes.length > 0 ? { create: requisicoes } : undefined,
-      },
-      include: { involucros: activeItems, requisicoes: activeItems },
-    });
+    const vestige = await prisma.$transaction(async (tx) => {
+      const created = await tx.vestige.create({
+        data: {
+          ...data,
+          createdBy: user.id,
+          involucros: involucros.length > 0 ? { create: involucros } : undefined,
+          requisicoes: requisicoes.length > 0 ? { create: requisicoes } : undefined,
+        },
+        include: { involucros: activeItems, requisicoes: activeItems },
+      });
 
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'CREATE',
-      targetType: 'vestige',
-      targetId: vestige.id,
-      details: { ...data, involucros, requisicoes },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
+      await auditService.logInTransaction(tx, {
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'CREATE',
+        targetType: 'vestige',
+        targetId: created.id,
+        details: { ...data, involucros, requisicoes },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return created;
+    }, CUSTODY_TX_OPTIONS);
 
     return vestige;
   });
@@ -372,25 +377,30 @@ export async function vestigeRoutes(server: FastifyInstance) {
     }
     const { involucros: involucrosPlan, requisicoes: requisicoesPlan } = plans;
 
-    if (data.destinacao && current.destinacao !== data.destinacao) {
-      await prisma.vestigeDestinationLog.create({
-        data: {
+    const destinationLog = data.destinacao && current.destinacao !== data.destinacao
+      ? {
           vestigeId: id,
           fromStatus: current.destinacao,
           toStatus: data.destinacao,
           observation: data.destinacaoObs || null,
           changedBy: user.id,
-        },
-      });
+        }
+      : null;
 
+    if (destinationLog) {
       (data as any).destinacaoChangedBy = user.id;
       (data as any).destinacaoChangedAt = new Date();
     }
 
-    // Numa transação só: se a gravação do vestígio falhar, nenhum item é incluído nem removido.
+    // Numa transação só: se a gravação do vestígio ou a auditoria falhar, nenhum item é incluído
+    // nem removido, e o histórico de destinação não registra uma mudança que não aconteceu.
     // Item removido não é apagado — recebe removedAt e some apenas das telas.
     const removedAt = new Date();
     const vestige = await prisma.$transaction(async (tx) => {
+      if (destinationLog) {
+        await tx.vestigeDestinationLog.create({ data: destinationLog });
+      }
+
       if (involucrosPlan && involucrosPlan.toRemove.length > 0) {
         await tx.vestigeInvolucro.updateMany({
           where: { id: { in: involucrosPlan.toRemove.map((item) => item.id) } },
@@ -411,7 +421,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         await tx.vestigeRequisicao.create({ data: { vestigeId: id, ...item } });
       }
 
-      return tx.vestige.update({
+      const updated = await tx.vestige.update({
         where: { id },
         data: {
           ...data,
@@ -419,26 +429,28 @@ export async function vestigeRoutes(server: FastifyInstance) {
         },
         include: { involucros: activeItems, requisicoes: activeItems },
       });
-    });
 
-    const involucrosChange = describeItemChange(involucrosPlan, current.involucros, vestige.involucros);
-    const requisicoesChange = describeItemChange(requisicoesPlan, current.requisicoes, vestige.requisicoes);
+      const involucrosChange = describeItemChange(involucrosPlan, current.involucros, updated.involucros);
+      const requisicoesChange = describeItemChange(requisicoesPlan, current.requisicoes, updated.requisicoes);
 
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'UPDATE',
-      targetType: 'vestige',
-      targetId: vestige.id,
-      details: {
-        ...data,
-        ...(involucrosChange ? { involucros: involucrosChange } : {}),
-        ...(requisicoesChange ? { requisicoes: requisicoesChange } : {}),
-      },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
+      await auditService.logInTransaction(tx, {
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'UPDATE',
+        targetType: 'vestige',
+        targetId: updated.id,
+        details: {
+          ...data,
+          ...(involucrosChange ? { involucros: involucrosChange } : {}),
+          ...(requisicoesChange ? { requisicoes: requisicoesChange } : {}),
+        },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return updated;
+    }, CUSTODY_TX_OPTIONS);
 
     return vestige;
   });
@@ -477,22 +489,24 @@ export async function vestigeRoutes(server: FastifyInstance) {
       return reply.status(404).send({ message: 'Vestígio não encontrado ou já excluído.' });
     }
 
-    await prisma.vestige.update({
-      where: { id },
-      data: { deletedAt: new Date(), updatedBy: user.id },
-    });
+    await prisma.$transaction(async (tx) => {
+      await tx.vestige.update({
+        where: { id },
+        data: { deletedAt: new Date(), updatedBy: user.id },
+      });
 
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'DELETE',
-      targetType: 'vestige',
-      targetId: id,
-      details: { material: existing.material, registroFav: existing.registroFav },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
+      await auditService.logInTransaction(tx, {
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'DELETE',
+        targetType: 'vestige',
+        targetId: id,
+        details: { material: existing.material, registroFav: existing.registroFav },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+    }, CUSTODY_TX_OPTIONS);
 
     return reply.status(204).send();
   });

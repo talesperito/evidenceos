@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../db/connection';
-import { auditService } from '../services/auditService';
+import { auditService, CUSTODY_TX_OPTIONS } from '../services/auditService';
 
 // Solicitações de retirada de vestígio. Desenho e decisões em
 // docs/plans/2026-08-25-solicitacao-retirada.md — ler as Partes 2 e 11 antes de mexer aqui.
@@ -206,42 +206,47 @@ export async function withdrawalRoutes(server: FastifyInstance) {
 
     const deadlineOverrideReason = overrideAplicado ? body.deadlineOverrideReason!.trim() : null;
 
-    // create aninhado é atômico: solicitação sem itens não pode existir.
-    const created = await prisma.withdrawalRequest.create({
-      data: {
-        scheduledFor: new Date(body.scheduledFor),
-        notes: body.notes?.trim() || null,
-        deadlineOverrideReason,
-        requestedBy: user.id,
-        items: {
-          create: body.items.map((item) => ({
-            vestigeId: item.vestigeId,
-            reason: item.reason,
-            reasonDetail: item.reason === 'OUTROS' ? item.reasonDetail?.trim() || null : null,
-          })),
+    // create aninhado é atômico: solicitação sem itens não pode existir. A auditoria entra na
+    // mesma transação: solicitação sem autor registrado também não.
+    const created = await prisma.$transaction(async (tx) => {
+      const solicitacao = await tx.withdrawalRequest.create({
+        data: {
+          scheduledFor: new Date(body.scheduledFor),
+          notes: body.notes?.trim() || null,
+          deadlineOverrideReason,
+          requestedBy: user.id,
+          items: {
+            create: body.items.map((item) => ({
+              vestigeId: item.vestigeId,
+              reason: item.reason,
+              reasonDetail: item.reason === 'OUTROS' ? item.reasonDetail?.trim() || null : null,
+            })),
+          },
         },
-      },
-      include: REQUEST_INCLUDE,
-    });
+        include: REQUEST_INCLUDE,
+      });
 
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'WITHDRAWAL_REQUESTED',
-      targetType: 'withdrawal_request',
-      targetId: created.id,
-      details: {
-        scheduledFor: body.scheduledFor,
-        itemCount: body.items.length,
-        vestigeIds,
-        reasons: body.items.map((item) => item.reason),
-        deadlineOverride: overrideAplicado,
-        ...(overrideAplicado ? { deadlineOverrideReason } : {}),
-      },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
+      await auditService.logInTransaction(tx, {
+        userId: user.id,
+        userEmail: user.email,
+        userName: user.name,
+        action: 'WITHDRAWAL_REQUESTED',
+        targetType: 'withdrawal_request',
+        targetId: solicitacao.id,
+        details: {
+          scheduledFor: body.scheduledFor,
+          itemCount: body.items.length,
+          vestigeIds,
+          reasons: body.items.map((item) => item.reason),
+          deadlineOverride: overrideAplicado,
+          ...(overrideAplicado ? { deadlineOverrideReason } : {}),
+        },
+        ipAddress: request.ip,
+        userAgent: request.headers['user-agent'],
+      });
+
+      return solicitacao;
+    }, CUSTODY_TX_OPTIONS);
 
     return reply.status(201).send(serializeRequest(created));
   });
@@ -325,33 +330,39 @@ export async function withdrawalRoutes(server: FastifyInstance) {
     }
 
     // Transição atômica: se dois operadores agirem ao mesmo tempo, só o primeiro grava (T-08).
-    const { count } = await prisma.withdrawalRequest.updateMany({
-      where: { id, status: 'SOLICITADA' },
-      data: {
-        status,
-        statusNote: statusNote?.trim() || null,
-        statusChangedBy: user.id,
-        statusChangedAt: new Date(),
-      },
-    });
+    const count = await prisma.$transaction(async (tx) => {
+      const result = await tx.withdrawalRequest.updateMany({
+        where: { id, status: 'SOLICITADA' },
+        data: {
+          status,
+          statusNote: statusNote?.trim() || null,
+          statusChangedBy: user.id,
+          statusChangedAt: new Date(),
+        },
+      });
+
+      if (result.count > 0) {
+        await auditService.logInTransaction(tx, {
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
+          action: 'WITHDRAWAL_STATUS_CHANGED',
+          targetType: 'withdrawal_request',
+          targetId: id,
+          details: { fromStatus: 'SOLICITADA', toStatus: status, statusNote: statusNote?.trim() || null },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
+      }
+
+      return result.count;
+    }, CUSTODY_TX_OPTIONS);
 
     if (count === 0) {
       const existing = await prisma.withdrawalRequest.findUnique({ where: { id }, select: { status: true } });
       if (!existing) return reply.status(404).send({ message: MSG_NAO_ENCONTRADA });
       return reply.status(409).send({ message: msgStatusTerminal(existing.status) });
     }
-
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'WITHDRAWAL_STATUS_CHANGED',
-      targetType: 'withdrawal_request',
-      targetId: id,
-      details: { fromStatus: 'SOLICITADA', toStatus: status, statusNote: statusNote?.trim() || null },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
 
     const updated = await prisma.withdrawalRequest.findUnique({ where: { id }, include: REQUEST_INCLUDE });
     return serializeRequest(updated);
@@ -394,10 +405,9 @@ export async function withdrawalRoutes(server: FastifyInstance) {
     const agora = new Date();
 
     // Uma transação só: metade aplicada deixaria solicitação concluída com vestígio ainda na URC,
-    // ou o inverso (T-13).
-    let movimentados: string[];
+    // ou o inverso (T-13). A auditoria entra nela: retirada sem registro é desfeita.
     try {
-      movimentados = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         // Trava e conclui. Se outro operador concluiu no mesmo instante, count = 0 e tudo aborta.
         const { count } = await tx.withdrawalRequest.updateMany({
           where: { id, status: 'SOLICITADA' },
@@ -441,8 +451,29 @@ export async function withdrawalRoutes(server: FastifyInstance) {
           });
           moved.push(vestigeId);
         }
-        return moved;
-      }, { timeout: 30_000 });
+
+        // Registrar o que NÃO saiu é deliberado: "por que este vestígio continuou na URC depois de
+        // agendado?" é uma pergunta que alguém vai fazer.
+        await auditService.logInTransaction(tx, {
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.name,
+          action: 'WITHDRAWAL_COMPLETED',
+          targetType: 'withdrawal_request',
+          targetId: id,
+          details: {
+            itemCount: total,
+            withdrawnCount: retirados.size,
+            withdrawnVestigeIds: [...retirados],
+            notWithdrawnVestigeIds: naoRetirados,
+            movedVestigeIds: moved,
+            partial: parcial,
+            statusNote: notaFinal,
+          },
+          ipAddress: request.ip,
+          userAgent: request.headers['user-agent'],
+        });
+      }, CUSTODY_TX_OPTIONS);
     } catch (error) {
       if (error instanceof StatusConflictError) {
         const atual = await prisma.withdrawalRequest.findUnique({ where: { id }, select: { status: true } });
@@ -450,28 +481,6 @@ export async function withdrawalRoutes(server: FastifyInstance) {
       }
       throw error;
     }
-
-    // Registrar o que NÃO saiu é deliberado: "por que este vestígio continuou na URC depois de
-    // agendado?" é uma pergunta que alguém vai fazer.
-    await auditService.log({
-      userId: user.id,
-      userEmail: user.email,
-      userName: user.name,
-      action: 'WITHDRAWAL_COMPLETED',
-      targetType: 'withdrawal_request',
-      targetId: id,
-      details: {
-        itemCount: total,
-        withdrawnCount: retirados.size,
-        withdrawnVestigeIds: [...retirados],
-        notWithdrawnVestigeIds: naoRetirados,
-        movedVestigeIds: movimentados,
-        partial: parcial,
-        statusNote: notaFinal,
-      },
-      ipAddress: request.ip,
-      userAgent: request.headers['user-agent'],
-    });
 
     const updated = await prisma.withdrawalRequest.findUnique({ where: { id }, include: REQUEST_INCLUDE });
     return serializeRequest(updated);
