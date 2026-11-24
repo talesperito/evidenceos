@@ -158,7 +158,9 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     fav: '',
     municipio: 'Lavras',
     data: new Date().toLocaleDateString('pt-BR'),
-    planilhaOrigem: 'Geral',
+    // Começa sem categoria: escolha obrigatória. O valor antigo, 'Geral', não existe no banco; o
+    // navegador exibia a primeira opção (Acessórios) e o salvamento falhava com "categoria inválida".
+    planilhaOrigem: '',
     // NOVOS CAMPOS
     estadoConservacao: 'NAO_AVALIADO',
     destinacao: 'NAO_INICIADO',
@@ -225,6 +227,10 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     if (showEditConfirm || isSaving) return;
     setError(null);
 
+    if (!formData.planilhaOrigem) {
+      setError('Selecione a categoria do vestígio.');
+      return;
+    }
     // REDS obrigatório só no cadastro novo (P13). PJe, quando informado, tem de ser válido.
     if (!isEdit && !(formData.reds || '').trim()) {
       setError('Informe o Nº REDS do vestígio.');
@@ -424,6 +430,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                  onChange={e => handleCategoryChange(e.target.value)}
                  className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none appearance-none"
                >
+                 <option value="" disabled>Selecione a categoria…</option>
                  {options.origins.map(o => <option key={o} value={o}>{o}</option>)}
                </select>
             </div>
@@ -541,7 +548,7 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                   Salvando...
                 </>
               ) : (
-                'Salvar Alterações'
+                isEdit ? 'Salvar Alterações' : 'Cadastrar Vestígio'
               )}
             </button>
           </div>
