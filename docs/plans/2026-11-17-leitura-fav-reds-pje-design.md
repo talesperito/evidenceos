@@ -479,14 +479,15 @@ bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pend
 - **Faixa de FAV:** FAVs acima de 2.500.000 não são pedidas ao PCNET (404 vestígios, quase todos Munições).
 - **Posição de REDS e PJe no card:** terceira fila, ao lado da Situação (6.2).
 
-### 12.4 Próximos passos, em ordem (nada disto foi feito)
+### 12.4 Próximos passos, em ordem (passo 1 feito em 24/11, ver 12.5)
 
 **A correção manual das pendências NÃO é pré-requisito do deploy** (esclarecido em 24/11: as funcionárias levariam
 semanas). A importação grava só as linhas `OK`, que não dependem de correção; as pendências ficam como estão (sem REDS) e
 são corrigidas depois, pela tela, no ritmo delas, com o REDS lançado à mão na edição. Vestígio corrigido entre o backup
 e a importação é pulado pelo importador (id + FAV).
 
-1. **Ver a tela rodando** (ambiente local) e o usuário aprovar card, formulário, confirmação de edição e busca.
+1. ~~**Ver a tela rodando** (ambiente local) e o usuário aprovar card, formulário, confirmação de edição e busca.~~
+   **Feito em 24/11** (12.5).
 2. O usuário confere **uma amostra** da planilha principal (10 a 20 linhas contra o PCNET), não a planilha inteira.
    Opcional: marcar "Conferido" nas linhas "Conferir" que quiser incluir já (32 de requisição, 39 de munições).
 3. Decisão do usuário: **push**.
@@ -518,7 +519,18 @@ e a importação é pulado pelo importador (id + FAV).
   REDS pela exclusão). Caso conferido: FAV 2309460 tinha 6 Celulares; ficou `e8ded13d` (invólucro 8548994, confere,
   recebe REDS) e `8da9ccba` (invólucro 6612752, não confere, continua em Erros).
 - **Tela:** api local (`node dist/server.js`, porta 3100, `DATABASE_URL` só no ambiente do processo, apontando para
-  `127.0.0.1:55432/lavras_restore`) e Vite (5173, `VITE_API_URL=http://localhost:3100`). Conferência do usuário: pendente.
+  `127.0.0.1:55432/lavras_restore`) e Vite (5173, `VITE_API_URL=http://localhost:3100`).
+- **Tela aprovada pelo usuário em 24/11:** card (REDS/PJe na 3ª fila, "Não informado", PJe formatado, filas 1–2
+  preservadas); busca por REDS/PJe com e sem pontuação e por parte do número (≥ 6 dígitos; traz todos os vestígios do
+  REDS; efeito colateral medido: 49 de 14.288 números de FAV/invólucro/requisição trazem resultado a mais, sempre junto
+  do certo); cadastro novo (REDS em branco recusado, REDS fora do padrão com aviso e gravado como digitado, PJe com DV
+  errado recusado); edição com confirmação listando REDS (campo crítico) e PJe com antes/depois; auditoria `CREATE` e
+  `UPDATE` com `numeroReds`/`numeroPje` (antes/depois). Vestígio de teste `eec6420c` (FAV 9999001) só no banco descartável.
+- **Ajustes feitos no teste (commits locais):** `d55d1fd` instrução da pesquisa rápida cita Nº REDS e Nº PJe;
+  `fa980be` cadastro novo começa sem categoria (o padrão 'Geral' não existia e quebrava o cadastro de Acessórios, defeito
+  de abril) e o botão diz "Cadastrar Vestígio".
+- **Achado fora do escopo, para depois do deploy:** o Relatório Analítico de Custódia tem anos fixos (2022–2025.2) e
+  ignora os vestígios de 2026 (1.108 no backup).
 
 ### 12.6 Riscos conhecidos
 
