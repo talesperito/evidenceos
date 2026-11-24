@@ -33,3 +33,7 @@ database/conferencias/
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Python
+__pycache__/
+*.pyc
