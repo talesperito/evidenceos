@@ -364,6 +364,11 @@ LEIA_ME = [
      "Achar a FAV certa (pelo invólucro, na Movimentação FAV do PCNET) e corrigir pela tela."],
     ["7 Sem REDS no PCNET", "A FAV existe, mas o campo REDS dela está vazio no próprio PCNET.",
      "Nada obrigatório: vestígio antigo pode ficar sem REDS. Se quiser, buscar o REDS pelo Nº PCnet."],
+    ["8 Invólucro não confere", "A FAV e a requisição estão certas (o REDS foi gravado), mas o invólucro no "
+     "EvidenceOS é diferente do invólucro atual da FAV no PCNET. Pode ser troca de invólucro ou erro de digitação "
+     "(ex.: FAV 1788081, invólucro 8057180 que não existe na FAV).",
+     "Abrir a FAV no PCNET (Movimentação FAV). Se o invólucro do EvidenceOS não aparece em lugar algum, é erro: "
+     "corrigir pela tela para o invólucro atual da FAV."],
 ]
 
 
@@ -414,6 +419,12 @@ def cmd_pendencias(args) -> int:
          for l in sem]
         + [[m["FAV correta (campo município)"], m["Id do vestígio"], "Munições", "", "", ""]
            for m in mun if m["Situação"] == "OK" and not m["REDS a gravar"]])
+    # Acrescentado em 24/11 (amostra do usuário): o invólucro não entra na regra do REDS (P8), mas um invólucro que
+    # não confere pode ser digitação no EvidenceOS. Fica só como pendência; o REDS dessas linhas é gravado.
+    abas["8 Invólucro não confere"] = (base + ["Corrigido"], sorted(
+        [pega(l) + [""] for l in pri
+         if l["Situação"] == "OK" and l["Invólucro confere?"] == "Não" and l["Id do vestígio"] not in em_dobro],
+        key=lambda r: int(r[0]) if r[0].isdigit() else 0))
 
     wb = Workbook()
     ws = wb.active

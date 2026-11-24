@@ -479,7 +479,7 @@ bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pend
 - **Faixa de FAV:** FAVs acima de 2.500.000 não são pedidas ao PCNET (404 vestígios, quase todos Munições).
 - **Posição de REDS e PJe no card:** terceira fila, ao lado da Situação (6.2).
 
-### 12.4 Próximos passos, em ordem (passo 1 feito em 24/11, ver 12.5)
+### 12.4 Próximos passos, em ordem (passos 1 e 2 feitos em 24/11, ver 12.5)
 
 **A correção manual das pendências NÃO é pré-requisito do deploy** (esclarecido em 24/11: as funcionárias levariam
 semanas). A importação grava só as linhas `OK`, que não dependem de correção; as pendências ficam como estão (sem REDS) e
@@ -488,8 +488,9 @@ e a importação é pulado pelo importador (id + FAV).
 
 1. ~~**Ver a tela rodando** (ambiente local) e o usuário aprovar card, formulário, confirmação de edição e busca.~~
    **Feito em 24/11** (12.5).
-2. O usuário confere **uma amostra** da planilha principal (10 a 20 linhas contra o PCNET), não a planilha inteira.
-   Opcional: marcar "Conferido" nas linhas "Conferir" que quiser incluir já (32 de requisição, 39 de munições).
+2. ~~O usuário confere **uma amostra** da planilha principal (10 a 20 linhas contra o PCNET), não a planilha inteira.~~
+   **Feito em 24/11** (16 linhas, 12.5). Opcional, ainda em aberto: marcar "Conferido" nas linhas "Conferir" que quiser
+   incluir já (32 de requisição, 39 de munições); se marcar, regerar os JSONs.
 3. Decisão do usuário: **push**.
 4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Se a produção tiver mudado desde 23/11
    21:49, refazer a lista, ler no PCNET só as FAVs que mudaram e regenerar planilhas e arquivos de importação; se não
@@ -529,6 +530,14 @@ e a importação é pulado pelo importador (id + FAV).
 - **Ajustes feitos no teste (commits locais):** `d55d1fd` instrução da pesquisa rápida cita Nº REDS e Nº PJe;
   `fa980be` cadastro novo começa sem categoria (o padrão 'Geral' não existia e quebrava o cadastro de Acessórios, defeito
   de abril) e o botão diz "Cadastrar Vestígio".
+- **Amostra conferida pelo usuário no PCNET em 24/11** (`amostra-conferencia-pcnet.xlsx`, 16 linhas sorteadas com
+  semente fixa, só OK): REDS e PJe certos nas **16**. Uma divergência de **invólucro**: FAV 1788081 tem no EvidenceOS o
+  invólucro 8057180, que não existe na FAV (nem como invólucro antigo): erro de digitação; o atual é 6613110.
+- **Decisão do usuário (24/11), complementa P8:** as **279** linhas OK cujo invólucro não confere com a FAV continuam
+  recebendo o REDS (FAV e requisição batem), e entram na aba nova **"8 Invólucro não confere"** do
+  `pendencias-para-correcao.xlsx`, para as funcionárias conferirem no PCNET e corrigirem pela tela. Gerada por
+  `pcnet-gerar-planilha.py pendencias`; abas 1–7 idênticas às de 23/11 (arquivo anterior guardado como
+  `pendencias-para-correcao-sem-aba8.xlsx`).
 - **Achado fora do escopo, para depois do deploy:** o Relatório Analítico de Custódia tem anos fixos (2022–2025.2) e
   ignora os vestígios de 2026 (1.108 no backup).
 
