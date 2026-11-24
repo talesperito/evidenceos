@@ -434,7 +434,7 @@ Resta:
    em 17/11** (nova decisão D24, seções 1, 3.1, 4, 7, 8.1, 9, 10 e 12). Falta acrescentar lá que grava-se o primeiro
    REDS (P6, 23/11) e que o REDS é obrigatório no cadastro novo (P13).
 
-## 12. Estado e próximos passos (atualizado em 2026-11-23, noite)
+## 12. Estado e próximos passos (atualizado em 2026-11-24)
 
 ### 12.1 O que existe
 
@@ -446,11 +446,18 @@ Resta:
 | Migration `numero_reds`/`numero_pje` | `server/prisma/migrations/20261123_0001_add_reds_pje/` | ensaiada com `migrate deploy` |
 | API (REDS obrigatório só no POST, PJe com DV, auditoria antes/depois, busca) | `server/src/routes/vestigeRoutes.ts`, `server/src/services/redsPjeService.ts` | compila; **sem teste automatizado** (o servidor não tem) |
 | Tela (card, formulário, confirmação de edição, busca) | `client/` | compila; **nunca vista rodando** |
-| `importar-reds-pje.cjs`, `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs` (reescrito), `_reds-pje-common.cjs` | `server/scripts/` | ensaiados no banco restaurado: 4.442 / 37 / 348; reexecução = 0 |
+| `importar-reds-pje.cjs`, `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs` (reescrito), `_reds-pje-common.cjs` | `server/scripts/` | ensaio fiel em 24/11 (ver 12.5): 37 / 348 / 4.759; reexecução = 0 |
 
 Arquivos de dados (fora do repositório, em `c:\tmp\pcnet-leitura\`): `2026-11-23\progresso.jsonl` (a leitura, com o texto
 bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pendencias-para-correcao.xlsx`),
-`municoes-2026-11-23\`, `investigacao-2026-11-23\`, `importacao\*.json`. Backup cifrado em `C:\Backups\EvidenceOS\`.
+`municoes-2026-11-23\`, `investigacao-2026-11-23\`, **`importacao-2026-11-24\*.json` (os que valem)**. Backup cifrado em
+`C:\Backups\EvidenceOS\`.
+
+> **Não usar `importacao\*.json` (23/11 21:29).** Foi gerado antes da regra do invólucro: tem 4.442 itens em vez de
+> 4.793. O de munições é idêntico ao novo (só muda a data de geração), mas, por simplicidade, usar os dois da pasta nova.
+> SHA-256 de `importacao-2026-11-24\importacao-reds-pje.json`: `45727926bc4c6499b60337249d77c4ab6836eccb33f0ff60e45388fe54aa1d4f`;
+> de `correcao-municoes.json`: `a8f5dfbdc9272d85caf443fbedac03e1cba3fd1a3f663517cf57d54b783c9fc2`. Se a produção mudar e as
+> planilhas forem refeitas, os JSONs (e os SHA-256) mudam também.
 
 ### 12.2 Números (backup de 2026-11-24T00:49Z = produção de 23/11 21:49; idêntico ao de 18:41Z)
 
@@ -498,7 +505,22 @@ e a importação é pulado pelo importador (id + FAV).
 10. Campo Belo: acrescentar no plano do ramo `campobelo` o primeiro REDS (P6) e o REDS obrigatório (P13). **Não tocar em
     Lavras nesse trabalho, nem o contrário.**
 
-### 12.5 Riscos conhecidos
+### 12.5 Teste local de 24/11 (passo 1)
+
+- **Build:** `server` (`tsc`) e `client` (`tsc` + `vite build`) sem erro.
+- **Banco descartável:** estava **intacto** (igual ao backup, sem a migration), e não "depois do deploy" como anotado em
+  23/11. Ensaio fiel refeito nele, na ordem da 7.5: `migrate deploy` → `excluir-duplicatas-fav` (diagnóstico 37, gravou
+  37) → `corrigir-municoes` (348 a corrigir, 3 pulados = cópias excluídas no passo anterior; gravou 348) →
+  `importar-reds-pje` com o JSON **novo** (4.793 itens: 4.759 gravados, 0 conflitos, 34 pulados = cópias excluídas).
+  Reexecução dos três = 0.
+- **Resultado:** 5.481 ativos; **5.075 com REDS; 406 sem REDS**; 2.354 com PJe.
+- Os 34 pulados são todos cópias do cadastro em dobro, e o vestígio que ficou em cada grupo está no JSON (ninguém perde
+  REDS pela exclusão). Caso conferido: FAV 2309460 tinha 6 Celulares; ficou `e8ded13d` (invólucro 8548994, confere,
+  recebe REDS) e `8da9ccba` (invólucro 6612752, não confere, continua em Erros).
+- **Tela:** api local (`node dist/server.js`, porta 3100, `DATABASE_URL` só no ambiente do processo, apontando para
+  `127.0.0.1:55432/lavras_restore`) e Vite (5173, `VITE_API_URL=http://localhost:3100`). Conferência do usuário: pendente.
+
+### 12.6 Riscos conhecidos
 
 - Uma FAV digitada errada que exista no PCNET devolve o REDS de outro vestígio. Mitigação: regra do invólucro, correção
   em produção e amostra de 10 vestígios.
