@@ -426,6 +426,24 @@ def cmd_pendencias(args) -> int:
          if l["Situação"] == "OK" and l["Invólucro confere?"] == "Não" and l["Id do vestígio"] not in em_dobro],
         key=lambda r: int(r[0]) if r[0].isdigit() else 0))
 
+    # Notas do que já foi conferido no PCNET (ex.: amostra de 24/11), para a funcionária não refazer. CSV com
+    # aba (prefixo do nome, ex. "8"), fav, id (opcional: vazio vale para todas as linhas da FAV na aba) e nota.
+    if args.notas:
+        notas = ler_csv(args.notas)
+        sem_uso = list(notas)
+        for nome, (cab, rows) in abas.items():
+            i_fav = cab.index("FAV") if "FAV" in cab else None
+            i_id = cab.index("Id do vestígio") if "Id do vestígio" in cab else None
+            cab.append("Já conferido no PCNET")
+            for r in rows:
+                achadas = [n for n in notas if nome.split()[0] == n["aba"].strip()
+                           and i_fav is not None and r[i_fav] == n["fav"].strip()
+                           and (not n["id"].strip() or (i_id is not None and r[i_id].startswith(n["id"].strip())))]
+                r.append(" | ".join(n["nota"] for n in achadas))
+                sem_uso = [n for n in sem_uso if n not in achadas]
+        for n in sem_uso:
+            print(f"  AVISO: nota sem linha correspondente: aba {n['aba']}, FAV {n['fav']}, id {n['id']}")
+
     wb = Workbook()
     ws = wb.active
     ws.title = "Leia-me"
@@ -435,7 +453,8 @@ def cmd_pendencias(args) -> int:
         for cel in c:
             cel.alignment = Alignment(wrap_text=True, vertical="top")
     for nome, (cab, rows) in abas.items():
-        escrever_aba(wb.create_sheet(nome), cab, rows, {"Id do vestígio": 38, "Situação": 34, "Material": 40})
+        escrever_aba(wb.create_sheet(nome), cab, rows, {"Id do vestígio": 38, "Situação": 34, "Material": 40,
+                                                        "Já conferido no PCNET": 60})
     wb.save(args.saida)
     print(f"Gravado: {args.saida}")
     for nome, (_, rows) in abas.items():
@@ -458,6 +477,7 @@ def main() -> int:
     s.add_argument("--municoes", required=True, help="correcoes-municoes.xlsx")
     s.add_argument("--dobro", required=True, help="cadastro-em-dobro.csv (do banco restaurado)")
     s.add_argument("--investigacao", required=True, help="investigacao.jsonl (FAVs com erro relidas)")
+    s.add_argument("--notas", help="CSV aba,fav,id,nota com o que já foi conferido no PCNET (opcional)")
     s.add_argument("--saida", required=True)
     s.set_defaults(func=cmd_pendencias)
     args = ap.parse_args()

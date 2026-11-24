@@ -538,6 +538,10 @@ e a importação é pulado pelo importador (id + FAV).
   `pendencias-para-correcao.xlsx`, para as funcionárias conferirem no PCNET e corrigirem pela tela. Gerada por
   `pcnet-gerar-planilha.py pendencias`; abas 1–7 idênticas às de 23/11 (arquivo anterior guardado como
   `pendencias-para-correcao-sem-aba8.xlsx`).
+- **O que já foi conferido vira nota para a funcionária** (pedido do usuário, 24/11): coluna nova "Já conferido no
+  PCNET" em todas as abas, preenchida por `pcnet-gerar-planilha.py pendencias --notas notas-conferidas.csv`
+  (`c:\tmp\pcnet-leitura\2026-11-24\`, colunas aba, fav, id opcional, nota). Hoje: 6 notas em 8 linhas (abas 1, 2, 4
+  e 8). **Ao regerar as pendências, passar sempre `--notas`**, senão as notas somem.
 - **Achado fora do escopo, para depois do deploy:** o Relatório Analítico de Custódia tem anos fixos (2022–2025.2) e
   ignora os vestígios de 2026 (1.108 no backup).
 
