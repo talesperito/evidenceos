@@ -1,269 +1,181 @@
 /**
- * Corrige os 403 vestígios da aba "Munições", cujas colunas vieram deslocadas.
+ * Corrige os vestígios da aba "Munições", cujas colunas vieram deslocadas da planilha do Google.
  *
- * O PROBLEMA
- * A aba "Munições" da planilha tem uma coluna a mais que as outras 28 — a que
- * traz a natureza da munição ("Deflagradas", "Intactas", "Necrópsia"). O Apps
- * Script lê as colunas por posição, então essa coluna extra empurrou todo o
- * resto uma casa. Resultado: cada campo do vestígio recebeu o valor do campo
- * seguinte.
+ * O PROBLEMA (diagnosticado em 2026-09-10, docs/plans/2026-07-26-reimportacao-planilha-google.md §8.3)
+ * A aba "Munições" tem uma coluna a mais (a natureza da munição). O Apps Script leu por posição e cada
+ * campo recebeu o valor do seguinte:
  *
- * A prova está no campo de data: em 370 das 403 linhas ele contém o nome de um
- * município ("Lavras", "Bom Sucesso", "Perdões"...). Data não guarda cidade.
+ *   registroFav  → é o LACRE (invólucro)      municipio → é a FAV verdadeira
+ *   invólucro    → é a requisição             requisição → é a natureza ("Deflagradas"...)
+ *   data         → era o município (o banco rejeitou e gravou nulo)
  *
- * COMO ESTÁ NO BANCO E COMO DEVE FICAR
+ * ESTA VERSÃO (2026-11-23) substitui a de 10/09, que nunca rodou: aquela apagava as observações, gravava
+ * na coluna `requisicao` congelada e excluía invólucros de verdade. Agora os dados vêm do PCNET, não da
+ * planilha: a FAV verdadeira foi lida no PCNET e o invólucro atual da FAV conferiu com o lacre (ou o
+ * usuário conferiu a linha). Desenho: docs/plans/2026-11-17-leitura-fav-reds-pje-design.md §7.4.
  *
- *   registroFav   2954532 (é o invólucro)   →  272963 (a FAV de verdade)
- *   invólucro     42406095 (é a requisição) →  2954532
- *   requisicao    "Necrópsia" (é a natureza)→  42406095, ou vazio
- *   tipoMaterial  vazio                     →  "Necrópsia"
- *   municipio     272963 (é a FAV)          →  vem da planilha
+ * Entrada: correcao-municoes.json, gerado no PC por scripts/pcnet-gerar-importacao.py a partir da
+ * planilha conferida. Por vestígio, numa transação, com auditoria FIX_MUNICOES_COLUNAS (antes/depois):
+ * - FAV           → a verdadeira
+ * - invólucro     → o lacre (motivo CORRECAO_CADASTRO); os itens antigos recebem removedAt
+ * - requisição    → as da FAV no PCNET (motivo CORRECAO_CADASTRO); os itens antigos (a natureza) recebem removedAt
+ * - tipoMaterial  → a natureza, só se estiver vazio
+ * - município     → o da planilha, ou N/I
+ * - observações   → ACRESCENTA uma nota; nada é apagado
+ * - REDS e PJe    → os da FAV, só se o campo estiver vazio
+ * Só age se o vestígio ainda estiver deslocado (FAV = lacre e município = FAV verdadeira); o resto é
+ * pulado e listado. Pode rodar de novo.
  *
- * O invólucro correto já está no banco: é o que hoje ocupa o campo FAV. Só o
- * município precisa ser buscado no snapshot, porque caiu no campo de data — que
- * é do tipo DateTime e rejeitou o texto, gravando nulo.
+ * Sem --confirmar, NÃO escreve nada.
  *
- * SOBRE A CONFIABILIDADE DO CONTEÚDO
- * A rotação de colunas é certa e vale para as 403. O conteúdo de cada linha,
- * não: o usuário conferiu 3 FAVs no PCNET em 2026-09-10 e 2 divergiam da
- * planilha. Essas 3 estão em CORRECOES_PCNET e sobrescrevem o snapshot. As
- * demais seguem a planilha e ficam marcadas na observação como pendentes de
- * conferência — para que uma auditoria futura saiba no que confiar.
- *
- * Sem argumentos, NÃO escreve nada.
- *
- * Uso:
- *   node scripts/corrigir-municoes.cjs                     # diagnóstico
- *   OPERADOR_EMAIL=voce@exemplo.com \
- *     node scripts/corrigir-municoes.cjs --confirmar       # aplica
+ * Uso (no console do `api`, em /app):
+ *   node scripts/corrigir-municoes.cjs <arquivo.json>                          # diagnóstico
+ *   OPERADOR_EMAIL=voce@exemplo.com node scripts/corrigir-municoes.cjs <arquivo.json> --confirmar
  */
+const {
+  createDbClients, TX_OPTIONS, linha, exigirLavras, lerArquivo, exigirOperador, mesmaFav,
+} = require('./_reds-pje-common.cjs');
 
-const fs = require('fs');
-const { createDbClients } = require('./_phase2-common.cjs');
-const { LATEST_SNAPSHOT_PATH, norm } = require('./_sync-common.cjs');
+const MOTIVO = 'CORRECAO_CADASTRO';
+const REDS = /^\d{4}-\d{9}-\d{3}$/;
+const PJE = /^\d{20}$/;
 
-/**
- * Dados conferidos pelo usuário DIRETO NO PCNET em 2026-09-10.
- * Têm precedência sobre a planilha. Chave: o invólucro (que hoje está gravado
- * no campo registroFav do banco).
- */
-const CORRECOES_PCNET = {
-  '2954561': { fav: '371709', requisicao: '043380235' },
-  '2954545': { fav: '344114', requisicao: null },
-  '2954532': { fav: '272963', requisicao: null },
-};
-
-/** Grafias divergentes da natureza e do município, conferidas uma a uma. */
-const NATUREZA = {
-  'Intacta': 'Intactas', 'intactas': 'Intactas', 'Intacto': 'Intactas',
-  'Deflagadas': 'Deflagradas', 'Deflagrada': 'Deflagradas',
-};
-const MUNICIPIO = { 'ijaci': 'Ijaci' };
-
-// Quando a planilha não informa o município. Decisão do usuário em 2026-09-10.
-const MUNICIPIO_PADRAO = 'N/I';
-
-function linha(char = '─', n = 78) { return char.repeat(n); }
+const nota = (item, data) =>
+  `[Correção ${data}] Aba "Munições" da planilha antiga com colunas deslocadas: FAV, invólucro, ` +
+  `requisição, natureza e município realocados. FAV ${item.fav_correta} conferida: ${item.fonte}; ` +
+  `invólucro ${item.involucro} era o número gravado no campo FAV.`;
 
 async function main() {
+  exigirLavras();
   const confirmado = process.argv.includes('--confirmar');
-  const operadorEmail = process.env.OPERADOR_EMAIL;
-  const operadorNome = process.env.OPERADOR_NOME || operadorEmail;
-
-  if (!fs.existsSync(LATEST_SNAPSHOT_PATH)) {
-    console.error(`\n❌ Snapshot não encontrado em ${LATEST_SNAPSHOT_PATH}`);
-    console.error('   Rode antes: node scripts/sync-dryrun.cjs\n');
-    process.exit(1);
-  }
-
-  const snapshot = JSON.parse(fs.readFileSync(LATEST_SNAPSHOT_PATH, 'utf8'));
-  const linhasMunicoes = snapshot.items.filter((i) => norm(i.planilhaOrigem) === 'Munições');
-
-  // Indexa a planilha pelo invólucro real (campo `fav` do snapshot), que é o
-  // valor hoje gravado como registroFav no banco — a ponte entre os dois lados.
-  const porInvolucro = new Map();
-  for (const item of linhasMunicoes) {
-    const inv = norm(item.fav);
-    if (!inv) continue;
-    if (!porInvolucro.has(inv)) porInvolucro.set(inv, []);
-    porInvolucro.get(inv).push(item);
-  }
-
+  const caminho = process.argv.slice(2).find((a) => !a.startsWith('--'));
+  const { dados, sha } = lerArquivo(caminho, 'correcao-municoes');
   const { pool, prisma, schema } = createDbClients();
+  const hoje = new Date().toISOString().slice(0, 10);
 
   try {
-    // Alvo: vestígios cujo município é numérico. É a assinatura inconfundível do
-    // deslocamento — nenhum vestígio correto tem número no lugar da cidade.
-    const candidatos = await prisma.vestige.findMany({
-      where: { deletedAt: null },
-      select: {
-        id: true, registroFav: true, requisicao: true, material: true,
-        municipio: true, tipoMaterial: true,
-        category: { select: { name: true } },
-        involucros: { select: { id: true, numero: true } },
-      },
-    });
-
-    const afetados = candidatos.filter((v) => /^[0-9]+$/.test(String(v.municipio || '').trim()));
-
+    const operador = confirmado ? await exigirOperador(prisma) : null;
+    const ativos = { where: { removedAt: null }, select: { id: true, numero: true, motivo: true }, orderBy: { id: 'asc' } };
     const planos = [];
-    const semCorrespondencia = [];
-    const duplicados = [];
+    const pulados = [];
 
-    for (const v of afetados) {
-      const involucroReal = norm(v.registroFav);
-      const linhasDaPlanilha = porInvolucro.get(involucroReal);
-
-      if (!linhasDaPlanilha) { semCorrespondencia.push(v); continue; }
-      if (linhasDaPlanilha.length > 1) duplicados.push({ vestige: v, linhas: linhasDaPlanilha });
-
-      const item = linhasDaPlanilha[0];
-      const pcnet = CORRECOES_PCNET[involucroReal];
-
-      const favPlanilha = norm(item.municipio);
-      const reqPlanilha = norm(item.involucro);
-      const naturezaBruta = norm(item.requisicao);
-      const municipioBruto = norm(item.data);
-
-      const natureza = NATUREZA[naturezaBruta] || naturezaBruta || null;
-      const municipio = MUNICIPIO[municipioBruto] || municipioBruto || MUNICIPIO_PADRAO;
-
-      planos.push({
-        vestige: v,
-        involucroReal,
-        fav: pcnet ? pcnet.fav : favPlanilha,
-        requisicao: pcnet ? pcnet.requisicao : (reqPlanilha || null),
-        tipoMaterial: natureza,
-        municipio,
-        fonte: pcnet ? 'PCNET' : 'planilha',
+    for (const item of dados.itens) {
+      const v = await prisma.vestige.findUnique({
+        where: { id: item.id },
+        select: {
+          id: true, deletedAt: true, registroFav: true, municipio: true, tipoMaterial: true, observacoes: true,
+          numeroReds: true, numeroPje: true, involucros: ativos, requisicoes: ativos,
+        },
       });
-    }
-
-    const doPcnet = planos.filter((p) => p.fonte === 'PCNET');
-
-    console.log(`\n${linha('═')}`);
-    console.log(confirmado ? 'CORREÇÃO DA ABA MUNIÇÕES — APLICANDO' : 'CORREÇÃO DA ABA MUNIÇÕES — DIAGNÓSTICO (nada será alterado)');
-    console.log(linha('═'));
-    console.log(`Banco (schema)              : ${schema}`);
-    console.log(`Linhas de Munições no snapshot : ${linhasMunicoes.length}`);
-    console.log(`Vestígios com município numérico: ${afetados.length}`);
-    console.log(linha('-'));
-    console.log(`A corrigir                  : ${planos.length}`);
-    console.log(`  ...com dado do PCNET      : ${doPcnet.length}  (conferidos pelo usuário)`);
-    console.log(`  ...com dado da planilha   : ${planos.length - doPcnet.length}  (pendentes de conferência)`);
-    console.log(`Sem correspondência         : ${semCorrespondencia.length}`);
-    console.log(`Invólucro repetido na planilha : ${duplicados.length}`);
-    console.log(linha('═'));
-
-    if (semCorrespondencia.length) {
-      console.log('\n⚠ Vestígios sem linha correspondente no snapshot (NÃO serão tocados):');
-      for (const v of semCorrespondencia.slice(0, 10)) {
-        console.log(`   FAV(atual) ${String(v.registroFav).padEnd(12)} ${v.material}`);
+      if (!v || v.deletedAt) { pulados.push({ item, motivo: 'vestígio excluído ou inexistente' }); continue; }
+      if (!mesmaFav(v.registroFav, item.fav_atual) || !mesmaFav(v.municipio, item.fav_correta)) {
+        pulados.push({ item, motivo: `não está mais deslocado (FAV ${v.registroFav}, município ${v.municipio})` });
+        continue;
       }
-      if (semCorrespondencia.length > 10) console.log(`   ... e mais ${semCorrespondencia.length - 10}`);
-    }
-
-    if (doPcnet.length) {
-      console.log(`\n${linha('═')}`);
-      console.log('CONFERIDOS NO PCNET — têm precedência sobre a planilha');
-      console.log(linha('═'));
-      for (const p of doPcnet) {
-        console.log(`  FAV ${p.fav}  ·  invólucro ${p.involucroReal}  ·  requisição ${p.requisicao || '(vazia)'}`);
+      if (!/^[A-Z0-9]+$/.test(item.involucro) || item.requisicoes.some((r) => !/^\d+$/.test(r))) {
+        pulados.push({ item, motivo: 'invólucro ou requisição fora do formato do sistema' });
+        continue;
       }
+      planos.push({ item, v });
     }
 
     console.log(`\n${linha('═')}`);
-    console.log('AMOSTRA DA CORREÇÃO (10 primeiros)');
+    console.log(confirmado ? 'CORREÇÃO DA ABA MUNIÇÕES — APLICANDO' : 'CORREÇÃO DA ABA MUNIÇÕES — DIAGNÓSTICO (nada foi alterado)');
     console.log(linha('═'));
-    for (const p of planos.slice(0, 10)) {
-      console.log(`\n[${p.fonte}] vestígio ${p.vestige.id.slice(0, 8)}`);
-      console.log(`   FAV        : ${p.vestige.registroFav}  →  ${p.fav}`);
-      console.log(`   invólucro  : ${p.vestige.involucros.map((i) => i.numero).join(',') || '(nenhum)'}  →  ${p.involucroReal}`);
-      console.log(`   requisição : ${p.vestige.requisicao || '(vazia)'}  →  ${p.requisicao || '(vazia)'}`);
-      console.log(`   tipo       : ${p.vestige.tipoMaterial || '(vazio)'}  →  ${p.tipoMaterial || '(vazio)'}`);
-      console.log(`   município  : ${p.vestige.municipio}  →  ${p.municipio}`);
+    console.log(`Banco (schema)     : ${schema}`);
+    console.log(`Arquivo SHA-256    : ${sha}`);
+    console.log(`Itens no arquivo   : ${dados.itens.length}`);
+    console.log(`A corrigir         : ${planos.length}`);
+    console.log(`  ...com REDS      : ${planos.filter((p) => REDS.test(p.item.reds || '')).length}`);
+    console.log(`Pulados            : ${pulados.length}`);
+    console.log(linha('═'));
+    for (const { item, v } of planos.slice(0, 5)) {
+      console.log(`\nvestígio ${v.id}`);
+      console.log(`   FAV        : ${v.registroFav}  →  ${item.fav_correta}`);
+      console.log(`   invólucro  : ${v.involucros.map((i) => i.numero).join(', ') || '(nenhum)'}  →  ${item.involucro}`);
+      console.log(`   requisição : ${v.requisicoes.map((r) => r.numero).join(', ') || '(nenhuma)'}  →  ${item.requisicoes.join(', ') || '(nenhuma)'}`);
+      console.log(`   tipo       : ${v.tipoMaterial || '(vazio)'}  →  ${v.tipoMaterial || item.natureza || '(vazio)'}`);
+      console.log(`   município  : ${v.municipio}  →  ${item.municipio}`);
+      console.log(`   REDS / PJe : ${item.reds || '-'} / ${item.pje || '-'}`);
     }
-
-    console.log(`\n${linha('═')}`);
+    if (planos.length > 5) console.log(`\n... e mais ${planos.length - 5}`);
+    if (pulados.length) {
+      console.log('\nPULADOS:');
+      for (const p of pulados) console.log(`  ${p.item.id}  FAV ${p.item.fav_correta}  ${p.motivo}`);
+    }
 
     if (!confirmado) {
-      console.log('\nEste foi o diagnóstico. Para aplicar:');
-      console.log('  OPERADOR_EMAIL=voce@exemplo.com node scripts/corrigir-municoes.cjs --confirmar\n');
+      console.log('\nPara aplicar:');
+      console.log(`  OPERADOR_EMAIL=voce@exemplo.com node scripts/corrigir-municoes.cjs ${caminho} --confirmar\n`);
       return;
     }
 
-    if (!operadorEmail) {
-      console.error('\n❌ Defina OPERADOR_EMAIL — a auditoria não pode ficar anônima.\n');
-      process.exit(1);
-    }
+    let corrigidos = 0;
+    for (const { item, v } of planos) {
+      const removedAt = new Date();
+      await prisma.$transaction(async (tx) => {
+        // Revalida dentro da transação: outro operador pode ter mexido desde o diagnóstico.
+        const atual = await tx.vestige.findUnique({ where: { id: v.id }, select: { registroFav: true, municipio: true, deletedAt: true } });
+        if (!atual || atual.deletedAt || !mesmaFav(atual.registroFav, item.fav_atual) || !mesmaFav(atual.municipio, item.fav_correta)) {
+          throw new Error(`vestígio ${v.id} mudou durante a execução; não alterado`);
+        }
 
-    const OBS_PLANILHA = 'Registro corrigido em 2026-09-10: a aba "Munições" da planilha tinha uma coluna a mais e o Apps Script deslocou todos os campos uma posição. FAV, invólucro, requisição, natureza e município foram realocados. Conteúdo proveniente da planilha — PENDENTE de conferência no PCNET.';
-    const OBS_PCNET = 'Registro corrigido em 2026-09-10: a aba "Munições" da planilha tinha uma coluna a mais e o Apps Script deslocou todos os campos uma posição. FAV, invólucro e requisição CONFERIDOS DIRETO NO PCNET pelo usuário, com precedência sobre a planilha.';
+        const invAntes = v.involucros.map(({ numero, motivo }) => ({ numero, motivo }));
+        const reqAntes = v.requisicoes.map(({ numero, motivo }) => ({ numero, motivo }));
+        const invSai = v.involucros.filter((i) => i.numero !== item.involucro);
+        const reqSai = v.requisicoes.filter((r) => !item.requisicoes.includes(r.numero));
+        if (invSai.length) await tx.vestigeInvolucro.updateMany({ where: { id: { in: invSai.map((i) => i.id) } }, data: { removedAt } });
+        if (reqSai.length) await tx.vestigeRequisicao.updateMany({ where: { id: { in: reqSai.map((r) => r.id) } }, data: { removedAt } });
+        if (!v.involucros.some((i) => i.numero === item.involucro)) {
+          await tx.vestigeInvolucro.create({ data: { vestigeId: v.id, numero: item.involucro, motivo: MOTIVO } });
+        }
+        for (const numero of item.requisicoes) {
+          if (!v.requisicoes.some((r) => r.numero === numero)) {
+            await tx.vestigeRequisicao.create({ data: { vestigeId: v.id, numero, motivo: MOTIVO } });
+          }
+        }
 
-    const resultado = await prisma.$transaction(async (tx) => {
-      let corrigidos = 0;
-      for (const p of planos) {
-        await tx.vestige.update({
-          where: { id: p.vestige.id },
+        const dadosNovos = {
+          registroFav: item.fav_correta,
+          municipio: item.municipio,
+          observacoes: [v.observacoes, nota(item, hoje)].filter(Boolean).join('\n'),
+          updatedBy: operador.id,
+          // Como na versão de 10/09: deixam de contar como linha da planilha e ficam protegidos da
+          // exclusão automática da sincronização.
+          importedFrom: 'manual',
+          importedAt: null,
+        };
+        if (!v.tipoMaterial && item.natureza) dadosNovos.tipoMaterial = item.natureza;
+        if (!v.numeroReds && REDS.test(item.reds || '')) dadosNovos.numeroReds = item.reds;
+        if (!v.numeroPje && PJE.test(item.pje || '')) dadosNovos.numeroPje = item.pje;
+        await tx.vestige.update({ where: { id: v.id }, data: dadosNovos });
+
+        await tx.auditLog.create({
           data: {
-            registroFav: p.fav || null,
-            requisicao: p.requisicao,
-            tipoMaterial: p.tipoMaterial,
-            municipio: p.municipio,
-            observacoes: p.fonte === 'PCNET' ? OBS_PCNET : OBS_PLANILHA,
-            // Não vieram da planilha de forma utilizável: passam a contar como
-            // cadastro do sistema, protegidos da exclusão automática.
-            importedFrom: 'manual',
-            importedAt: null,
+            userId: operador.id,
+            userEmail: operador.email,
+            userName: operador.name,
+            action: 'FIX_MUNICOES_COLUNAS',
+            targetType: 'vestige',
+            targetId: v.id,
+            details: {
+              motivo: 'Aba "Municoes" da planilha com coluna extra: campos deslocados uma posicao',
+              fonte: item.fonte,
+              registroFav: { antes: v.registroFav, depois: item.fav_correta },
+              municipio: { antes: v.municipio, depois: item.municipio },
+              involucros: { antes: invAntes, depois: [item.involucro] },
+              requisicoes: { antes: reqAntes, depois: item.requisicoes },
+              tipoMaterial: dadosNovos.tipoMaterial ? { antes: null, depois: dadosNovos.tipoMaterial } : undefined,
+              numeroReds: dadosNovos.numeroReds ? { antes: null, depois: dadosNovos.numeroReds } : undefined,
+              numeroPje: dadosNovos.numeroPje ? { antes: null, depois: dadosNovos.numeroPje } : undefined,
+              arquivoSha256: sha,
+            },
           },
         });
-
-        // O invólucro gravado é a requisição deslocada: substituir, não somar.
-        await tx.vestigeInvolucro.deleteMany({ where: { vestigeId: p.vestige.id } });
-        await tx.vestigeInvolucro.create({
-          data: { vestigeId: p.vestige.id, numero: p.involucroReal },
-        });
-
-        corrigidos += 1;
-      }
-
-      await tx.auditLog.create({
-        data: {
-          userEmail: operadorEmail,
-          userName: operadorNome,
-          action: 'FIX_MUNICOES_COLUNAS',
-          targetType: 'vestige',
-          details: {
-            schema,
-            motivo: 'Aba "Municoes" da planilha com coluna extra: Apps Script deslocou todos os campos uma posicao',
-            corrigidos,
-            comDadoDoPcnet: doPcnet.length,
-            comDadoDaPlanilha: corrigidos - doPcnet.length,
-            semCorrespondencia: semCorrespondencia.length,
-            involucroRepetidoNaPlanilha: duplicados.length,
-          },
-        },
-      });
-
-      return corrigidos;
-    }, { maxWait: 30_000, timeout: 300_000 });
-
-    console.log(`\n${linha('═')}`);
-    console.log('✅ CORREÇÃO APLICADA');
-    console.log(linha('═'));
-    console.log(`Corrigidos                  : ${resultado}`);
-    console.log(`  com dado do PCNET         : ${doPcnet.length}`);
-    console.log(`  com dado da planilha      : ${resultado - doPcnet.length}  (pendentes de conferência)`);
-    console.log(linha('-'));
-    console.log('Registrado em AuditLog com action=FIX_MUNICOES_COLUNAS.');
-    console.log('Cada vestígio carrega na observação de onde veio o dado.');
-    console.log(linha('═'));
-
-    if (duplicados.length) {
-      console.log(`\n⚠ ${duplicados.length} invólucro(s) aparecem em mais de uma linha da planilha.`);
-      console.log('  Podem ter virado registros duplicados no banco. Confira e exclua pela tela:');
-      for (const d of duplicados) console.log(`   invólucro ${d.vestige.registroFav} → ${d.linhas.length} linhas na planilha`);
+      }, TX_OPTIONS);
+      corrigidos += 1;
     }
+    console.log(`\n✅ Corrigidos: ${corrigidos}. Auditoria FIX_MUNICOES_COLUNAS em cada um, com antes e depois.\n`);
   } finally {
     await prisma.$disconnect();
     await pool.end();
@@ -272,6 +184,7 @@ async function main() {
 
 main().catch((error) => {
   console.error('\n❌ ERRO:', error.message);
-  console.error('   A transação foi revertida — o banco NÃO foi alterado.');
+  console.error('   O vestígio em que o erro ocorreu não foi alterado (uma transação por vestígio).');
+  console.error('   Os anteriores já corrigidos continuam corrigidos: rode de novo, eles serão pulados.\n');
   process.exit(1);
 });
