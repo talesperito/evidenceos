@@ -63,7 +63,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading, options }) =
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Pesquisa rápida — FAV, Requisição ou Invólucro"
+              placeholder="Pesquisa rápida — FAV, Requisição, Invólucro, Nº REDS ou Nº PJe"
               className="w-full pl-10 pr-4 py-3 bg-zinc-800/60 text-white border border-white/10 rounded-xl placeholder-zinc-600 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all font-mono text-sm"
               disabled={isLoading}
             />
