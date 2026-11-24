@@ -9,6 +9,7 @@ import {
   getMotivoLabel,
   numerosDe,
 } from '../types';
+import { formatPje, pjeDigits } from '../services/redsPje';
 
 export interface FieldChange {
   label: string;
@@ -56,6 +57,13 @@ export const computeVestigeChanges = (original: Vestige, edited: Partial<Vestige
   push('Requisição(ões)', asNumeros(original.requisicoes), asItemsAfter(original.requisicoes, edited.requisicoes));
   push('Invólucro(s)', asNumeros(original.involucros), asItemsAfter(original.involucros, edited.involucros), true);
   push('FAV', asText(original.fav), asText(edited.fav), true);
+  push('Nº REDS', asText(original.reds), asText(edited.reds), true);
+  // PJe comparado só pelos dígitos: "5005818-18.2026..." e "50058181820..." são o mesmo número.
+  push(
+    'Nº PJe',
+    asText(original.pje) ? formatPje(original.pje) : '',
+    pjeDigits(asText(edited.pje)) ? formatPje(edited.pje) : '',
+  );
   push('Data do evento / entrada', asText(original.data), asText(edited.data));
   push('Município', asText(original.municipio), asText(edited.municipio));
   push('Categoria', asText(original.planilhaOrigem), asText(edited.planilhaOrigem));

@@ -9,6 +9,7 @@ import {
   planCreate,
   planUpdate,
 } from '../services/vestigeItemService';
+import { PjeInvalidoError, normalizePje, normalizeReds, searchVariants } from '../services/redsPjeService';
 
 const VALID_ESTADO_CONSERVACAO = [
   'NAO_AVALIADO', 'NOVO_LACRADO', 'SEMI_NOVO',
@@ -91,6 +92,11 @@ export async function vestigeRoutes(server: FastifyInstance) {
         { registroFav: { contains: search, mode: 'insensitive' } },
         { requisicoes: { some: { removedAt: null, numero: { contains: search, mode: 'insensitive' } } } },
         { involucros: { some: { removedAt: null, numero: { contains: search, mode: 'insensitive' } } } },
+        // REDS e PJe: com ou sem pontuação (o PJe é guardado só com dígitos).
+        ...searchVariants(search).flatMap((term) => [
+          { numeroReds: { contains: term } },
+          { numeroPje: { contains: term } },
+        ]),
       ];
     }
     return where;
@@ -281,20 +287,35 @@ export async function vestigeRoutes(server: FastifyInstance) {
       observacoes: z.string().optional(),
       estadoConservacao: z.enum(VALID_ESTADO_CONSERVACAO as [string, ...string[]]).default('NAO_AVALIADO'),
       destinacao: z.enum(VALID_DESTINACAO as [string, ...string[]]).default('NAO_INICIADO'),
+      // REDS obrigatório no cadastro novo (P13). Fora do padrão AAAA-NNNNNNNNN-SSS é aceito: a tela avisa (P12).
+      numeroReds: z.string().optional(),
+      numeroPje: z.string().optional(),
     });
 
-    const { involucros: rawInvolucros, requisicoes: rawRequisicoes, ...data } = vestigeSchema.parse(request.body);
+    const {
+      involucros: rawInvolucros, requisicoes: rawRequisicoes, numeroReds: rawReds, numeroPje: rawPje, ...rest
+    } = vestigeSchema.parse(request.body);
     const user = request.user as any;
+
+    const numeroReds = normalizeReds(rawReds);
+    if (!numeroReds) {
+      return reply.status(400).send({ message: 'Informe o Nº REDS do vestígio.' });
+    }
 
     let involucros;
     let requisicoes;
+    let numeroPje;
     try {
       involucros = planCreate('involucro', rawInvolucros);
       requisicoes = planCreate('requisicao', rawRequisicoes);
+      numeroPje = normalizePje(rawPje);
     } catch (error) {
-      if (error instanceof VestigeItemError) return reply.status(400).send({ message: error.message });
+      if (error instanceof VestigeItemError || error instanceof PjeInvalidoError) {
+        return reply.status(400).send({ message: error.message });
+      }
       throw error;
     }
+    const data = { ...rest, numeroReds, numeroPje };
 
     const vestige = await prisma.$transaction(async (tx) => {
       const created = await tx.vestige.create({
@@ -345,9 +366,24 @@ export async function vestigeRoutes(server: FastifyInstance) {
       estadoConservacao: z.enum(VALID_ESTADO_CONSERVACAO as [string, ...string[]]).optional(),
       destinacao: z.enum(VALID_DESTINACAO as [string, ...string[]]).optional(),
       destinacaoObs: z.string().optional(),
+      // Na edição o REDS não é obrigatório (vestígio antigo ainda sem REDS, P13). Texto vazio limpa o campo.
+      numeroReds: z.string().optional(),
+      numeroPje: z.string().optional(),
     });
 
-    const { involucros: rawInvolucros, requisicoes: rawRequisicoes, ...data } = updateSchema.parse(request.body);
+    const {
+      involucros: rawInvolucros, requisicoes: rawRequisicoes, numeroReds: rawReds, numeroPje: rawPje, ...data
+    } = updateSchema.parse(request.body);
+
+    // Só mexe no campo que o cliente enviou.
+    const redsPje: { numeroReds?: string | null; numeroPje?: string | null } = {};
+    try {
+      if (rawReds !== undefined) redsPje.numeroReds = normalizeReds(rawReds);
+      if (rawPje !== undefined) redsPje.numeroPje = normalizePje(rawPje);
+    } catch (error) {
+      if (error instanceof PjeInvalidoError) return reply.status(400).send({ message: error.message });
+      throw error;
+    }
 
     const storedItems = {
       where: { removedAt: null },
@@ -357,7 +393,9 @@ export async function vestigeRoutes(server: FastifyInstance) {
 
     const current = await prisma.vestige.findFirst({
       where: { id, deletedAt: null },
-      select: { destinacao: true, involucros: storedItems, requisicoes: storedItems },
+      select: {
+        destinacao: true, numeroReds: true, numeroPje: true, involucros: storedItems, requisicoes: storedItems,
+      },
     });
 
     if (!current) {
@@ -425,6 +463,7 @@ export async function vestigeRoutes(server: FastifyInstance) {
         where: { id },
         data: {
           ...data,
+          ...redsPje,
           updatedBy: user.id,
         },
         include: { involucros: activeItems, requisicoes: activeItems },
@@ -432,6 +471,11 @@ export async function vestigeRoutes(server: FastifyInstance) {
 
       const involucrosChange = describeItemChange(involucrosPlan, current.involucros, updated.involucros);
       const requisicoesChange = describeItemChange(requisicoesPlan, current.requisicoes, updated.requisicoes);
+      // REDS e PJe são campos simples: o valor trocado só fica guardado aqui, no antes/depois da auditoria.
+      const campoChange = (campo: 'numeroReds' | 'numeroPje') =>
+        campo in redsPje && (redsPje[campo] ?? null) !== (current[campo] ?? null)
+          ? { [campo]: { antes: current[campo] ?? null, depois: redsPje[campo] ?? null } }
+          : {};
 
       await auditService.logInTransaction(tx, {
         userId: user.id,
@@ -442,6 +486,8 @@ export async function vestigeRoutes(server: FastifyInstance) {
         targetId: updated.id,
         details: {
           ...data,
+          ...campoChange('numeroReds'),
+          ...campoChange('numeroPje'),
           ...(involucrosChange ? { involucros: involucrosChange } : {}),
           ...(requisicoesChange ? { requisicoes: requisicoesChange } : {}),
         },

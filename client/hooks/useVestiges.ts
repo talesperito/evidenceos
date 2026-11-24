@@ -124,11 +124,19 @@ export const useVestiges = () => {
 
     const searchTerm = normalize(filters.term);
     const isNumericSearch = /^\d+$/.test(searchTerm);
+    // REDS e PJe: busca ignorando hífen e pontos, e traz TODOS os vestígios ligados ao número
+    // (REDS e PJe se repetem entre vestígios). Mínimo de 6 dígitos para não casar com qualquer coisa.
+    const termDigits = searchTerm.replace(/\D/g, '');
+    const matchesRedsPje = (vestige: Vestige) =>
+      termDigits.length >= 6 &&
+      ((vestige.reds || '').replace(/\D/g, '').includes(termDigits) || (vestige.pje || '').includes(termDigits));
 
     const results = currentData.filter((vestige) => {
       let matchesTerm = true;
       if (filters.term && filters.term.trim() !== '') {
-        if (filters.field === 'all') {
+        if (filters.field === 'all' && matchesRedsPje(vestige)) {
+          matchesTerm = true;
+        } else if (filters.field === 'all') {
           if (isNumericSearch) {
             matchesTerm =
               normalize(vestige.fav) === searchTerm ||

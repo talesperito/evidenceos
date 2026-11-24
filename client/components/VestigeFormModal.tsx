@@ -14,6 +14,7 @@ import {
 import { XIcon } from './icons/XIcon';
 import { checkDuplicate, DuplicateAlert } from '../services/dataService';
 import ConfirmEditModal, { computeVestigeChanges, FieldChange } from './ConfirmEditModal';
+import { REDS_FORA_DO_PADRAO, redsForaDoPadrao, validatePje } from '../services/redsPje';
 
 interface VestigeFormModalProps {
   initialData?: Vestige | null;
@@ -162,6 +163,8 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     estadoConservacao: 'NAO_AVALIADO',
     destinacao: 'NAO_INICIADO',
     destinacaoObs: '',
+    reds: '',
+    pje: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +224,17 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
     // reabrir o fluxo nem disparar um segundo salvamento.
     if (showEditConfirm || isSaving) return;
     setError(null);
+
+    // REDS obrigatório só no cadastro novo (P13). PJe, quando informado, tem de ser válido.
+    if (!isEdit && !(formData.reds || '').trim()) {
+      setError('Informe o Nº REDS do vestígio.');
+      return;
+    }
+    const pjeError = validatePje(formData.pje || '');
+    if (pjeError) {
+      setError(pjeError);
+      return;
+    }
 
     // Preflight: verificar duplicatas (apenas se não houve confirmação prévia)
     if (!pendingSubmit) {
@@ -356,6 +370,39 @@ const VestigeFormModal: React.FC<VestigeFormModalProps> = ({ initialData, onClos
                />
                <p className="text-[10px] text-slate-500 mt-1">Informe a data real do evento. Datas retroativas são permitidas.</p>
              </div>
+
+            {/* REDS e PJe — identificação na FAV do PCNET. REDS obrigatório só no cadastro novo. */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">
+                Nº REDS {isEdit && <span className="font-normal text-slate-500">(como está na FAV)</span>}
+              </label>
+              <input
+                type="text"
+                required={!isEdit}
+                value={formData.reds || ''}
+                onChange={e => handleChange('reds', e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none font-mono"
+                placeholder="Ex: 2026-045817588-001"
+              />
+              {redsForaDoPadrao(formData.reds || '') && (
+                <p className="text-[10px] text-amber-400 mt-1">{REDS_FORA_DO_PADRAO}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">
+                Nº PJe <span className="font-normal text-slate-500">(opcional — só quando houver processo)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.pje || ''}
+                onChange={e => handleChange('pje', e.target.value)}
+                className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:border-cyan-500 outline-none font-mono"
+                placeholder="Ex: 5005818-18.2026.8.13.0382"
+              />
+              {(formData.pje || '').trim() !== '' && validatePje(formData.pje || '') && (
+                <p className="text-[10px] text-red-400 mt-1">{validatePje(formData.pje || '')}</p>
+              )}
+            </div>
 
             {/* Linha 4 */}
             <div>

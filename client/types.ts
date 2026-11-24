@@ -65,6 +65,9 @@ export interface Vestige {
   destinacaoObs?: string;
   destinacaoChangedBy?: string;
   destinacaoChangedAt?: string;
+  // Identificação na FAV do PCNET. '' = não informado. PJe só com os 20 dígitos (formatar com formatPje).
+  reds: string;
+  pje: string;
 }
 
 export interface CategoryStats {

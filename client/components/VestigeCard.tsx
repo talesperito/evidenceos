@@ -8,6 +8,7 @@ import { DocumentReportIcon } from './icons/DocumentReportIcon';
 import ScheduleModal from './ScheduleModal';
 import { buildPcnetUrl, logPcnetAction } from '../services/dataService';
 import { formatScheduledShort } from '../services/withdrawalService';
+import { NAO_INFORMADO, formatPje } from '../services/redsPje';
 
 interface VestigeCardProps {
   vestige: Vestige;
@@ -258,6 +259,22 @@ const VestigeCard: React.FC<VestigeCardProps> = ({
               {vestige.destinacaoObs}
             </p>
           )}
+        </div>
+
+        {/* REDS e PJe ficam na terceira fila, ao lado da Situação: assim as duas primeiras filas
+            mantêm o alinhamento de sempre. Texto menor (text-sm) porque o PJe formatado tem 25
+            caracteres e precisa caber numa coluna do layout de 4 colunas. */}
+        <div>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Nº REDS</p>
+          {vestige.reds
+            ? <p className="font-medium text-white text-sm font-mono break-all">{vestige.reds}</p>
+            : <p className="text-sm text-zinc-500 italic">{NAO_INFORMADO}</p>}
+        </div>
+        <div>
+          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Nº PJe</p>
+          {vestige.pje
+            ? <p className="font-medium text-white text-sm font-mono break-all">{formatPje(vestige.pje)}</p>
+            : <p className="text-sm text-zinc-500 italic">{NAO_INFORMADO}</p>}
         </div>
       </div>
       

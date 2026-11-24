@@ -23,6 +23,8 @@ interface ApiVestige {
   destinacaoObs?: string | null;
   destinacaoChangedBy?: string | null;
   destinacaoChangedAt?: string | null;
+  numeroReds?: string | null;
+  numeroPje?: string | null;
 }
 
 const formatDate = (value?: string | null) => {
@@ -57,6 +59,8 @@ const mapVestige = (item: ApiVestige): Vestige => ({
   destinacaoObs: item.destinacaoObs || undefined,
   destinacaoChangedBy: item.destinacaoChangedBy || undefined,
   destinacaoChangedAt: item.destinacaoChangedAt || undefined,
+  reds: item.numeroReds || '',
+  pje: item.numeroPje || '',
 });
 
 let categoryCache: ApiCategory[] | null = null;
@@ -97,6 +101,9 @@ const buildPayload = async (vestige: Partial<Vestige>) => ({
   estadoConservacao: vestige.estadoConservacao || undefined,
   destinacao: vestige.destinacao || undefined,
   destinacaoObs: vestige.destinacaoObs || undefined,
+  // Sempre enviados (texto vazio limpa o campo na edição). O servidor tira a pontuação do PJe.
+  numeroReds: vestige.reds ?? '',
+  numeroPje: vestige.pje ?? '',
 });
 
 export const fetchAllVestiges = async (): Promise<Vestige[]> => {
