@@ -474,18 +474,25 @@ bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pend
 
 ### 12.4 Próximos passos, em ordem (nada disto foi feito)
 
-1. As funcionárias trabalham nas abas 1, 2, 3, 5 e 6 de `pendencias-para-correcao.xlsx`; o usuário confere as planilhas e
-   marca "Conferido" nas linhas "Conferir" que aprovar.
-2. **Ver a tela rodando** (ambiente local com o banco restaurado) antes de implantar.
-3. Decisão do usuário: **push** (ele só autoriza depois de conferir tudo).
-4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Depois, refazer a lista, ler no PCNET só as
-   FAVs que mudaram, regenerar planilhas e arquivos de importação.
+**A correção manual das pendências NÃO é pré-requisito do deploy** (esclarecido em 24/11: as funcionárias levariam
+semanas). A importação grava só as linhas `OK`, que não dependem de correção; as pendências ficam como estão (sem REDS) e
+são corrigidas depois, pela tela, no ritmo delas, com o REDS lançado à mão na edição. Vestígio corrigido entre o backup
+e a importação é pulado pelo importador (id + FAV).
+
+1. **Ver a tela rodando** (ambiente local) e o usuário aprovar card, formulário, confirmação de edição e busca.
+2. O usuário confere **uma amostra** da planilha principal (10 a 20 linhas contra o PCNET), não a planilha inteira.
+   Opcional: marcar "Conferido" nas linhas "Conferir" que quiser incluir já (32 de requisição, 39 de munições).
+3. Decisão do usuário: **push**.
+4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Se a produção tiver mudado desde 23/11
+   21:49, refazer a lista, ler no PCNET só as FAVs que mudaram e regenerar planilhas e arquivos de importação; se não
+   mudou, usar os arquivos já gerados.
 5. Deploy do **`api`**, `cd /app && npx prisma@7.7.0 migrate deploy`, deploy do **`web`**; conferir um vestígio editado
    à mão e o registro em Logs de Auditoria.
 6. No console do `api`, cada um primeiro **sem** `--confirmar`: `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs`,
    `importar-reds-pje.cjs` (os dois últimos recebem o `.json`; conferir o SHA-256).
 7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha.
-8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13).
+8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13). Entregar `pendencias-para-correcao.xlsx`
+   para elas trabalharem pela tela, sem prazo; ao corrigir um vestígio, lançam o REDS à mão.
 9. No fim: apagar `c:\tmp\restauracao-lavras\`, o container `evidenceos-restore-lavras` e os PDFs de amostra
    (`c:\tmp\pcnet-favs-amostra\`), com aviso ao usuário (5.4).
 10. Campo Belo: acrescentar no plano do ramo `campobelo` o primeiro REDS (P6) e o REDS obrigatório (P13). **Não tocar em
