@@ -553,6 +553,12 @@ e a importação é pulado pelo importador (id + FAV).
   de antes → rodar o comparador (100% do banco). Edições das funcionárias entre os dois backups aparecem como "edição
   pela tela" (auditadas); de preferência, deploy em horário sem uso. Opcional: reler no PCNET ~300 FAVs com o usuário
   logado e comparar com o REDS/PJe gravados.
+- **Releitura de 300 FAVs no PCNET (24/11, usuário logado; antes do push):** amostra fixa do banco do ensaio (260
+  importação + 30 munições + 10 "sem REDS"), fora as 16 da amostra manual. **REDS e PJe: 300 de 300 iguais ao
+  gravado**; os 10 sem REDS continuam sem REDS. Invólucro diferente do atual da FAV em 21 de 260 (8%), **todos já na aba
+  8** das pendências (dígito trocado, zero/letra à frente, texto no próprio PCNET, número diferente). Dados e
+  `resultado-releitura.xlsx` em `c:\tmp\pcnet-leitura\releitura-2026-11-24\`. O leitor parou na 299ª pela trava de 10
+  erros seguidos (as FAVs sem REDS estavam juntas no fim da lista); a última foi lida na mesma sessão.
 - **Achado fora do escopo, para depois do deploy:** o Relatório Analítico de Custódia tem anos fixos (2022–2025.2) e
   ignora os vestígios de 2026 (1.108 no backup).
 
