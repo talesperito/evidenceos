@@ -1,7 +1,10 @@
 # Leitura das FAVs no PCNET: REDS e Nº PJe
 
-**Data:** 2026-11-17 · **Revisado:** 2026-11-23 (leitura por linha, texto bruto guardado, piloto ao vivo) ·
-**Status:** plano, sem execução · nada implementado
+**Data:** 2026-11-17 · **Revisado:** 2026-11-23 (leitura por linha, texto bruto guardado, piloto ao vivo; no mesmo dia:
+Chrome no lugar do Firefox, requisições na planilha, correção das munições, limpeza do cadastro em dobro) ·
+**Status (23/11, noite):** **etapas A, B e C feitas** (4.878 FAVs lidas, planilhas geradas) e **código da etapa D/E pronto
+e ensaiado** numa cópia restaurada da produção. **Nada foi para a produção:** sem push, sem deploy, nada gravado.
+Ver a seção 12 (estado e próximos passos).
 
 Origem: pedido de 17/11 (item 3: "integrar com o PCNET, da mesma forma que ele faz hoje, via URL, mas lendo outros
 dados"). Relaciona-se com `docs/plans/2026-07-24-integracao-pcnet.md` (botões "Ver FAV" e "Movimentar") e com o plano
@@ -28,8 +31,9 @@ EvidenceOS:
 - **Nº REDS**: sempre presente na FAV.
 - **Nº PJe**: só aparece nas FAVs mais novas. Quando não existir, fica vazio.
 
-Antes de qualquer gravação, o resultado sai numa **planilha para conferência**. Ela também alerta as FAVs com mais de
-uma requisição e compara as requisições da FAV com as do EvidenceOS.
+Antes de qualquer gravação, o resultado sai numa **planilha para conferência**, com FAV, REDS e PJe. Ela mostra as
+requisições da FAV (até 5 colunas), alerta as FAVs com mais de uma e traz um sinal automático "Requisição confere?"
+contra as do EvidenceOS (P8, seção 5.5). O invólucro não entra na planilha.
 
 ## 2. Decisões
 
@@ -38,15 +42,15 @@ uma requisição e compara as requisições da FAV com as do EvidenceOS.
 | P1 | Nº PCnet | **Fora do escopo.** O número varia muito e dá erro; não é lido nem gravado | Definido pelo usuário em 17/11 |
 | P2 | REDS | Lido do cabeçalho da FAV, formato `AAAA-NNNNNNNNN-SSS` (ano com 4 dígitos, 9 dígitos, sequência `001`, `002`…). Gravado completo, com ano e sequência | Definido em 17/11 |
 | P3 | Nº PJe | Lido do cabeçalho quando existir. Guardado com os 20 dígitos, sem pontuação; a tela mostra formatado (`NNNNNNN-DD.AAAA.J.TR.OOOO`) | "ok" do usuário em 17/11 |
-| P4 | PJe ausente | Na planilha aparece **"Não informado"** (não "XXX"). No banco o campo fica **vazio**, para não entrar em buscas e contagens como se fosse um número. A tela mostra "Não informado" | Definido em 17/11 |
+| P4 | PJe ausente | Na planilha aparece **"Não informado"** (não "XXX"). No banco o campo fica **vazio**, para não entrar em buscas e contagens como se fosse um número. A tela mostra "Não informado". **Só o PJe com os 20 dígitos padrão e dígito verificador válido vai para a planilha e para o banco. Todo o resto (campo com lixo como `.`, `0`, `1`, `x`; número cortado ou em formato antigo; dígito verificador inválido) vira "Não informado".** Se havia um número de verdade (mais de 1 dígito), a coluna Alerta traz "PJe fora do padrão, tratado como Não informado (lido: …)"; campo só com lixo é tratado como vazio, sem alerta | Ausente: 17/11. Regra do PJe fora do padrão: 23/11 (no leitor, deixou de ser erro) |
 | P5 | Quantos vestígios por número | **REDS e PJe se repetem entre vestígios**: uma ocorrência e um processo costumam ter vários vestígios. Nenhum dos dois é exclusivo e repetição **não é duplicata**. A única regra de exclusividade é **uma FAV por vestígio** | Definido pelo usuário em 17/11 |
-| P6 | Um REDS por vestígio | **Campo simples**, como o PJe: cada vestígio guarda **um** REDS. Quando a FAV trouxer dois, grava-se **o primeiro** (o da esquerda); a planilha mostra os dois e alerta. Vale para as duas unidades e substitui a D13 de Campo Belo (lista de REDS) | Campo simples: 17/11. "Qualquer um serve, adote um padrão": 23/11 |
+| P6 | Um REDS por vestígio | **Campo simples**, como o PJe: cada vestígio guarda **um** REDS. Quando a FAV trouxer dois **ou três**, grava-se **o primeiro** (o da esquerda); a planilha mostra todos e alerta. Mais de três é erro. Vale para as duas unidades e substitui a D13 de Campo Belo (lista de REDS) | Campo simples: 17/11. "Qualquer um serve, adote um padrão": 23/11. Até 3 REDS aceitos (o leitor já tinha achado 81 FAVs com três em 1.880 lidas): 23/11 |
 | P7 | PJe por vestígio | Um campo simples: cada vestígio tem no máximo um PJe, que pode ser o mesmo de muitos outros vestígios | Decorre de P3 e P5 |
-| P8 | Requisições | A planilha tem espaço para **até 5 requisições** por FAV e **alerta** as FAVs com mais de uma. Mostra também quais requisições da FAV não estão no EvidenceOS. **Não são gravadas** por este plano | Até 5 e alerta: 17/11. Só na planilha: 23/11 |
+| P8 | Requisições e invólucro | A planilha mostra as **requisições da FAV em até 5 colunas**, **alerta** as FAVs com mais de uma e traz **uma coluna automática "Requisição confere?"** contra as requisições ativas do EvidenceOS (regras em 5.5). Requisições **não são gravadas**. O **invólucro** não entra na planilha (fica só no progresso) | Até 5 e alerta: 17/11. Só na planilha: 23/11. Em 23/11 o usuário chegou a dispensar tudo ("FAV, REDS e PJe bastam") e depois voltou atrás, escolhendo a opção C: requisições à vista **e** o sinal de conferência. Motivo: a conferência por requisição é a única que denuncia FAV digitada errada, porque o PJe só existe nas FAVs novas |
 | P12 | REDS fora do padrão | **Na tela:** aviso, sem bloquear a gravação. **Na importação:** não grava; a linha vai para o relatório de erros (aba **Erros**, 5.5) | Definido em 23/11 |
 | P13 | REDS obrigatório | **Obrigatório no cadastro de vestígio novo** a partir do deploy. Na edição de vestígio antigo ainda sem REDS, não bloqueia. Todo vestígio que terminar a importação sem REDS (sem FAV, FAV sem REDS, REDS fora do padrão, erro de leitura) entra no mesmo relatório de erros | Definido em 23/11 |
 | P14 | Novas leituras | **Não haverá.** Depois do deploy, REDS e PJe são digitados no cadastro dos vestígios novos. PJe que surgir depois num vestígio antigo é lançado à mão, pela tela | Definido em 23/11 |
-| P15 | Navegador | **Firefox** (o usuário usa o Mozilla com o PCNET). O Playwright usa o Firefox dele próprio, instalado uma vez, em janela e perfil separados do Firefox do dia a dia | Definido em 23/11 |
+| P15 | Navegador | ~~Firefox do Playwright~~ **Chrome** instalado no Windows, aberto pelo script **sem automação**, em janela e perfil separados (`c:\tmp\pcnet-leitura\perfil-chrome\`). O script só se conecta (CDP, 127.0.0.1:9222) **depois** do login | Firefox definido em 23/11; trocado no mesmo dia: no piloto o Cloudflare do login do PCNET barrou o Firefox controlado pelo Playwright ("Verification failed"), e o usuário aceitou Chrome |
 | P9 | Origem da lista de FAVs | Backup recente de Lavras restaurado num Postgres descartável neste PC. **A produção não é consultada** | "ok" em 17/11 |
 | P10 | Login no PCNET | O usuário entra à mão no navegador que o script abre. O script nunca vê usuário, senha ou código | "ok" em 17/11 |
 | P11 | Quais FAVs | Todas as de Lavras, inclusive de vestígios já retirados | "ok" em 17/11 |
@@ -152,7 +156,8 @@ nunca.
   navegador. Nada de URL nova ou de outra página do PCNET.
 - **Sessão caída:** se a resposta não começar com `%PDF` (página de login, erro), o script **para**, avisa e espera o
   usuário entrar de novo. Não tenta logar sozinho e não insiste.
-- **Ritmo:** uma FAV a cada 2–3 segundos, em lotes de 500, com pausa entre lotes. Cerca de 5.000 FAVs levam de 3 a
+- **Ritmo:** uma FAV a cada 2–3 segundos, em lotes de **1000** (o usuário pediu 1000 em 23/11; o plano dizia 500;
+  parâmetro `--lote`), com pausa de 60 s entre lotes. O script também para sozinho se 10 FAVs seguidas saírem com erro. Cerca de 5.000 FAVs levam de 3 a
   4 horas, que podem ser divididas em vários dias.
 - **Retomada:** cada FAV lida é gravada na hora num arquivo de progresso (`progresso.jsonl`). Se a janela fechar ou o
   PC desligar, a nova execução continua de onde parou.
@@ -164,10 +169,10 @@ nunca.
 | Campo | Onde | Regra | Se falhar |
 |---|---|---|---|
 | FAV | `FICHA DE ACOMPANHAMENTO DE VESTÍGIO N.º:` | igual à pedida, sem zeros à esquerda | erro "FAV diferente da pedida" |
-| REDS | **na mesma linha** do rótulo `Nº REDS:` | separar por espaço ou vírgula; cada número `^\d{4}-\d{9}-\d{3}$`; se houver dois, os dois são lidos na ordem em que aparecem e grava-se o primeiro (P6) | vazio: erro "FAV sem REDS"; fora do formato: erro "REDS fora do padrão" (valor lido vai para a planilha, nada é gravado); mais de dois: erro "FAV com mais de dois REDS" |
-| PJe | **na mesma linha** do rótulo `Nº PJe:` | 20 dígitos e dígito verificador CNJ válido | nada na linha: "Não informado"; DV inválido: erro "PJe com dígito inválido" |
+| REDS | **na mesma linha** do rótulo `Nº REDS:` | separar por espaço ou vírgula; cada número `^\d{4}-\d{9}-\d{3}$`; se houver dois ou três, todos são lidos na ordem em que aparecem (a vírgula sobrando no fim é ignorada) e grava-se o primeiro (P6), com alerta | vazio: erro "FAV sem REDS"; **o REDS a gravar (o primeiro)** fora do formato: erro "REDS fora do padrão" (valor lido vai para a planilha, nada é gravado); REDS **adicional** fora do formato: só alerta, com o valor lido (23/11, visto na FAV 1280038, cujo 2º REDS veio sem o último dígito); mais de três: erro "FAV com mais de três REDS" |
+| PJe | **na mesma linha** do rótulo `Nº PJe:` | 20 dígitos e dígito verificador CNJ válido | **não é erro:** nada na linha, lixo ou fora do padrão: "Não informado" (P4); alerta com o valor lido quando havia número de verdade |
 | Requisições | `Exame pericial (nº requisição):` até `COLETA` | separar por vírgula; cada uma `^\d{4}-\d{9}$` | fora do formato: aviso, valor lido vai para a planilha |
-| Invólucro atual | `Número/Descrição invólucro atual:` | texto | só para conferência |
+| Invólucro atual | `Número/Descrição invólucro atual:` | texto | só fica no progresso (P8) |
 
 As expressões aceitam qualquer caractere no lugar do `º` e dos acentos, que saem trocados na extração.
 
@@ -210,17 +215,16 @@ Arquivo `.xlsx`, uma linha por vestígio, todas as células de número como **te
 | Coluna | Conteúdo |
 |---|---|
 | FAV | número da FAV |
+| Id do vestígio | do EvidenceOS (backup); o importador localiza o vestígio por id + FAV |
 | Categoria, Município, Destinação | do EvidenceOS (backup) |
-| REDS 1 (FAV) / REDS 2 (FAV) | lidos da FAV, na ordem em que aparecem; REDS 2 vazio quase sempre |
+| REDS 1 / REDS 2 / REDS 3 (FAV) | lidos da FAV, na ordem em que aparecem; REDS 2 e 3 vazios quase sempre |
 | REDS a gravar | o primeiro (P6) |
 | PJe (FAV) | lido da FAV, formatado; **"Não informado"** quando não existir |
-| Qtde requisições (FAV) | número |
-| **Alerta** | "Mais de uma requisição" quando > 1; "FAV com dois REDS" quando houver REDS 2 (os dois alertas podem aparecer juntos) |
+| **Alerta** | "Mais de uma requisição" quando > 1; "FAV com dois REDS" / "FAV com três REDS" quando houver REDS 2 ou 3; "PJe fora do padrão, tratado como Não informado (lido: …)" (os alertas podem aparecer juntos) |
 | Requisição 1 … Requisição 5 | da FAV, no formato original (`2026-059354601`) |
 | Demais requisições | se houver mais de 5, as excedentes separadas por vírgula |
 | Requisições no EvidenceOS | as ativas, como estão gravadas |
-| Requisições da FAV ausentes no EvidenceOS | comparação ignorando ano e zeros à esquerda |
-| Invólucro atual (FAV) / Invólucros no EvidenceOS / Invólucro confere? | conferência |
+| **Requisição confere?** | comparação **ignorando ano e zeros à esquerda** (no EvidenceOS elas estão gravadas sobretudo como 8 dígitos puros, sem ano; texto como `x`, `Deflagradas` ou `Intactas` **não conta** como requisição). `Sim`: todas as da FAV estão no EvidenceOS. `Parcial`: só algumas. `Não`: nenhuma (**é o sinal de FAV possivelmente digitada errada**: filtrar e conferir primeiro). `Sem requisição no sistema` e `FAV sem requisição`: não há o que comparar |
 | Situação | `OK`, `Erro: …`, `Sessão caída`, `FAV repetida no EvidenceOS` |
 | Conferido | coluna vazia para o usuário marcar |
 
@@ -233,8 +237,8 @@ reúne:
 - vestígios sem FAV no EvidenceOS (não há o que ler);
 - FAV sem REDS;
 - REDS fora do padrão (com o valor lido, para o usuário ver);
-- FAV com mais de dois REDS;
-- FAV diferente da pedida, PJe com dígito inválido e qualquer outro erro de leitura;
+- FAV com mais de três REDS;
+- FAV diferente da pedida, FAV que o PCNET não devolveu em PDF e qualquer outro erro de leitura;
 - FAV repetida no EvidenceOS.
 
 Cada linha traz FAV, id do vestígio, categoria e o motivo. Com ela o usuário completa ou corrige à mão, pela tela.
@@ -264,7 +268,7 @@ Antes do deploy, a migration é ensaiada no banco descartável da etapa A, que t
 | `server/src/services/vestigeItemService.ts` | sem mudança: REDS não é lista (P6) |
 | `server/src/routes/vestigeRoutes.ts` | listagem, busca e detalhe devolvem `numeroReds` e `numeroPje`; criação e edição aceitam os dois. **REDS obrigatório na criação** (P13), opcional na edição. REDS fora de `^\d{4}-\d{9}-\d{3}$` **não é recusado** pelo servidor (P12): o aviso fica na tela. PJe validado (20 dígitos + DV). Mudanças nos dois entram na auditoria da edição, com antes e depois |
 | `client/services/dataService.ts` | `mapVestige` traz REDS e PJe |
-| `client/components/VestigeCard.tsx` | mostra REDS e PJe formatado; "Não informado" no que estiver vazio |
+| `client/components/VestigeCard.tsx` | mostra REDS e PJe formatado; "Não informado" (cinza, itálico) no que estiver vazio. **Posição (23/11, sugestão do usuário):** na terceira fila, ao lado da Situação, para não deslocar as duas primeiras filas (Material, Requisição, Invólucro, FAV / Município, Data, Tempo de Custódia, Conservação). Texto `text-sm` em fonte monoespaçada: o PJe formatado tem 25 caracteres |
 | Formulário e `ConfirmEditModal.tsx` | dois campos de texto, REDS e PJe, que entram na conferência de edição. REDS obrigatório no cadastro novo. REDS fora do padrão mostra aviso ("REDS fora do padrão AAAA-NNNNNNNNN-SSS. Confira antes de salvar.") e deixa salvar |
 | `client/hooks/useVestiges.ts` (busca rápida) | procura também em REDS e PJe, ignorando hífen e pontos. Buscar um REDS ou PJe traz **todos** os vestígios ligados a ele |
 | `/check-duplicate` | sem mudança: continua só para FAV e invólucro. REDS e PJe repetidos não geram alerta (P5) |
@@ -315,15 +319,66 @@ O arquivo de importação não vai para o repositório.
   categoria). Isso pega também os vestígios cadastrados entre o backup da etapa A e o deploy, que não estavam na
   planilha e foram criados quando o REDS ainda não era obrigatório. Essa lista completa o relatório de erros (5.5).
 
-### 7.3 Ordem do deploy (só Lavras)
+### 7.3 Cadastro em dobro (acrescentado em 23/11)
+
+A rodada achou 209 FAVs repetidas no EvidenceOS (430 vestígios). 69 delas são **cadastro em dobro** (mesma FAV,
+categoria e invólucro); no backup, 27 desses grupos são idênticos em tudo e foram criados com menos de 5 minutos de
+diferença (duplo clique). O usuário pediu que o script limpe esses.
+
+`server/scripts/excluir-duplicatas-fav.cjs`:
+
+- **Detecta na hora, na produção** (não usa o backup): grupos com a mesma FAV, categoria e invólucros ativos.
+- Só age num grupo se os vestígios forem **idênticos** em material, tipo, município, data de coleta, observações,
+  destinação, estado de conservação e requisições ativas; criados com **menos de 5 minutos** de diferença; e com
+  histórico (destinação, retirada ou ação no PCNET) em **no máximo um** deles. O resto é só listado.
+- **Fica** o que tem histórico; se nenhum tiver, o cadastrado primeiro. Os outros recebem a **mesma exclusão da tela**
+  (`deletedAt`, `updatedBy`) e auditoria `DELETE` com motivo "cadastro em dobro" e o id do que ficou. Uma transação
+  por grupo.
+- Sem `--confirmar`, só mostra. Com `--confirmar`, exige `OPERADOR_EMAIL` de um usuário ativo.
+
+Os grupos que diferem (42 no backup) e as FAVs repetidas entre vestígios diferentes (140) ficam com o usuário, pela
+lista `favs-repetidas-no-evidenceos.csv`.
+
+### 7.4 Correção da aba Munições (acrescentado em 23/11)
+
+A correção pausada desde 10/09 (`docs/plans/2026-07-26-reimportacao-planilha-google.md`, seção 8.3) foi retomada pelo
+usuário em 23/11, agora com os dados **conferidos no PCNET**, e não mais da planilha:
+
+- a FAV verdadeira está no campo `municipio` (7 de 7 conferidas à mão pelo usuário no PCNET);
+- a leitura da FAV verdadeira confirma, linha a linha, que o **invólucro atual da FAV é o número que hoje está no
+  campo FAV** (351 de 390). Os 39 que não conferem só entram se o usuário marcar "Conferido" na planilha
+  `correcoes-municoes.xlsx`.
+
+`server/scripts/corrigir-municoes.cjs` é **reescrito** (o de 10/09 apagava as observações, gravava na coluna
+`requisicao` congelada e excluía invólucros de verdade). Lê um JSON gerado da planilha conferida e, por vestígio:
+
+| Campo | Fica com |
+|---|---|
+| FAV | a FAV verdadeira, conferida no PCNET |
+| Invólucro | o lacre (o número hoje no campo FAV), motivo `CORRECAO_CADASTRO`; o item antigo (que era a requisição) recebe `removedAt` |
+| Requisição | as requisições **da FAV no PCNET**, só dígitos e sem ano, como as demais do sistema, motivo `CORRECAO_CADASTRO`; o item antigo (a natureza) recebe `removedAt` |
+| Tipo do material | a natureza (Deflagradas, Intactas, Necrópsia), só se estiver vazio |
+| Município | o da planilha (que caiu no campo de data); sem ele, `N/I` (decisão de 10/09) |
+| Observações | **acrescenta** uma nota de correção; nada é apagado |
+| REDS e PJe | os da FAV, só se o campo estiver vazio |
+
+Só age se o vestígio ainda estiver no estado deslocado (FAV = lacre e município = FAV verdadeira); o que já foi
+corrigido ou mudou é pulado e listado. Uma transação por vestígio, com auditoria `FIX_MUNICOES_COLUNAS` (antes e
+depois) dentro dela. Sem `--confirmar`, só mostra.
+
+### 7.5 Ordem do deploy (só Lavras)
 
 1. Backup manual (obrigatório: há migration), com cópia no PC e no Drive.
 2. `git push` da `main` e conferência com `git ls-remote` antes de implantar.
 3. Deploy do **`api`** de Lavras e, no console do `api`: `cd /app && npx prisma@7.7.0 migrate deploy`.
 4. Deploy do **`web`** de Lavras.
 5. Conferência pela tela: um vestígio editado à mão com REDS e PJe e o registro dele em Logs de Auditoria.
-6. Importação: primeiro sem `--confirmar`, conferência dos totais, depois com `--confirmar`.
-7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha.
+6. Cadastro em dobro (7.3): sem `--confirmar`, conferência, depois com `--confirmar`.
+7. Munições (7.4): idem.
+8. Importação de REDS e PJe (7.2): idem.
+9. Conferência por amostra: 10 vestígios abertos na tela contra a planilha.
+
+Todos os scripts são ensaiados antes no banco restaurado neste PC (etapa A), com a migration aplicada.
 
 `db` não recebe deploy; só a migration, pelo `api`. **Campo Belo (`api-cb`, `web-cb`, `pg-cb`): nenhuma ação.**
 
@@ -359,14 +414,14 @@ O script não terá modo `--pendentes`.
 ## 10. Fora deste plano
 
 - Nº PCnet (P1) e qualquer outro dado da FAV.
-- Gravar no EvidenceOS as requisições que estão na FAV e faltam no sistema (só aparecem na planilha).
+- Gravar requisições no EvidenceOS, ou conferir o invólucro (P8). A requisição só aparece e é conferida na planilha.
 - Campo Belo (item 1) e a planilha por categoria (item 2), decididos depois.
 - Novas leituras periódicas no PCNET (P14).
 
 ## 11. Pontos em aberto
 
 Decididos em 23/11 e levados para a tabela da seção 2: qual REDS guardar (P6: o primeiro), REDS fora do padrão (P12),
-REDS obrigatório (P13), requisições só na planilha (P8), sem novas leituras (P14), Firefox (P15).
+REDS obrigatório (P13), requisições na planilha com sinal de conferência (P8, opção C), sem novas leituras (P14), navegador (P15, depois trocado por Chrome).
 
 Login no PCNET também resolvido em 23/11: sem certificado; o usuário loga na janela do script (5.2).
 
@@ -378,3 +433,68 @@ Resta:
    REDS (seção 7.1 daquele plano) deixam de existir. **O plano de Campo Belo, no ramo `campobelo`, já foi atualizado
    em 17/11** (nova decisão D24, seções 1, 3.1, 4, 7, 8.1, 9, 10 e 12). Falta acrescentar lá que grava-se o primeiro
    REDS (P6, 23/11) e que o REDS é obrigatório no cadastro novo (P13).
+
+## 12. Estado e próximos passos (atualizado em 2026-11-23, noite)
+
+### 12.1 O que existe
+
+| Peça | Onde | Estado |
+|---|---|---|
+| Leitor das FAVs, busca no PCNET (Chrome sem automação + CDP), `--reprocessar` | `scripts/pcnet-leitura-fav.py`, testes em `scripts/test_pcnet_leitura_fav.py` (32) | feito; rodou 4.878 FAVs + 377 das munições |
+| Gerador de planilhas (principal, munições, pendências) | `scripts/pcnet-gerar-planilha.py` | feito |
+| Gerador dos arquivos de importação (com SHA-256) | `scripts/pcnet-gerar-importacao.py` | feito |
+| Migration `numero_reds`/`numero_pje` | `server/prisma/migrations/20261123_0001_add_reds_pje/` | ensaiada com `migrate deploy` |
+| API (REDS obrigatório só no POST, PJe com DV, auditoria antes/depois, busca) | `server/src/routes/vestigeRoutes.ts`, `server/src/services/redsPjeService.ts` | compila; **sem teste automatizado** (o servidor não tem) |
+| Tela (card, formulário, confirmação de edição, busca) | `client/` | compila; **nunca vista rodando** |
+| `importar-reds-pje.cjs`, `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs` (reescrito), `_reds-pje-common.cjs` | `server/scripts/` | ensaiados no banco restaurado: 4.442 / 37 / 348; reexecução = 0 |
+
+Arquivos de dados (fora do repositório, em `c:\tmp\pcnet-leitura\`): `2026-11-23\progresso.jsonl` (a leitura, com o texto
+bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pendencias-para-correcao.xlsx`),
+`municoes-2026-11-23\`, `investigacao-2026-11-23\`, `importacao\*.json`. Backup cifrado em `C:\Backups\EvidenceOS\`.
+
+### 12.2 Números (backup de 2026-11-24T00:49Z = produção de 23/11 21:49; idêntico ao de 18:41Z)
+
+- 5.518 vestígios ativos. Ganham REDS: **4.793** pela planilha principal (já com a regra do invólucro) **+ 319** munições.
+- Ficam sem REDS cerca de 400: 153 cujas FAVs não têm REDS no próprio PCNET (aceitável, P13), mais os bloqueados e os
+  erros de cadastro, que dependem das correções manuais (`pendencias-para-correcao.xlsx`).
+- O total de vestígios só cai pelos **37 cadastros em dobro idênticos** (exclusão lógica, reversível, auditada), e o
+  script é opcional.
+- A produção só recebeu edições até 19/11 (212 edições em 104 vestígios, nenhuma exclusão), todas já contidas nos números
+  acima.
+
+### 12.3 Decisões de 23/11 que não estão nas seções acima
+
+- **Regra do invólucro:** o invólucro do vestígio igual ao "invólucro atual" da FAV no PCNET prova que o vestígio é dono
+  da FAV; libera a FAV repetida (248) e a requisição que não confere (72). Fica como alerta, não como erro.
+- **FAV repetida:** cadastro em dobro idêntico = excluído pelo script (7.3); o resto, pelas funcionárias.
+- **Munições:** correção retomada com os dados do PCNET (7.4). Os 39 em que o lacre não confere só entram se o usuário
+  marcar "Conferido".
+- **Faixa de FAV:** FAVs acima de 2.500.000 não são pedidas ao PCNET (404 vestígios, quase todos Munições).
+- **Posição de REDS e PJe no card:** terceira fila, ao lado da Situação (6.2).
+
+### 12.4 Próximos passos, em ordem (nada disto foi feito)
+
+1. As funcionárias trabalham nas abas 1, 2, 3, 5 e 6 de `pendencias-para-correcao.xlsx`; o usuário confere as planilhas e
+   marca "Conferido" nas linhas "Conferir" que aprovar.
+2. **Ver a tela rodando** (ambiente local com o banco restaurado) antes de implantar.
+3. Decisão do usuário: **push** (ele só autoriza depois de conferir tudo).
+4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Depois, refazer a lista, ler no PCNET só as
+   FAVs que mudaram, regenerar planilhas e arquivos de importação.
+5. Deploy do **`api`**, `cd /app && npx prisma@7.7.0 migrate deploy`, deploy do **`web`**; conferir um vestígio editado
+   à mão e o registro em Logs de Auditoria.
+6. No console do `api`, cada um primeiro **sem** `--confirmar`: `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs`,
+   `importar-reds-pje.cjs` (os dois últimos recebem o `.json`; conferir o SHA-256).
+7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha.
+8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13).
+9. No fim: apagar `c:\tmp\restauracao-lavras\`, o container `evidenceos-restore-lavras` e os PDFs de amostra
+   (`c:\tmp\pcnet-favs-amostra\`), com aviso ao usuário (5.4).
+10. Campo Belo: acrescentar no plano do ramo `campobelo` o primeiro REDS (P6) e o REDS obrigatório (P13). **Não tocar em
+    Lavras nesse trabalho, nem o contrário.**
+
+### 12.5 Riscos conhecidos
+
+- Uma FAV digitada errada que exista no PCNET devolve o REDS de outro vestígio. Mitigação: regra do invólucro, correção
+  em produção e amostra de 10 vestígios.
+- A sessão do PCNET expira 30 minutos depois da última interação **do usuário**; o script não a renova (decisão de não
+  contornar o limite). Uma rodada de releitura exige o usuário presente.
+- O servidor e a tela não têm testes automatizados; a validação foi `tsc` e o ensaio dos scripts.

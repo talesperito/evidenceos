@@ -531,6 +531,10 @@ Duas decisões de desenho que valem manter em qualquer script parecido:
 
 ## 8.3 Aba "Munições" — 🔶 DIAGNOSTICADO, CORREÇÃO PAUSADA
 
+> **Retomada em 2026-11-23**, com os dados conferidos no PCNET e não mais na planilha. O script foi reescrito
+> (o desta seção apagava observações, gravava na coluna `requisicao` congelada e excluía invólucros).
+> Ver `docs/plans/2026-11-17-leitura-fav-reds-pje-design.md`, seção 7.4. O texto abaixo é o registro de 10/09.
+
 ### O problema
 
 A aba "Munições" tem **uma coluna a mais** que as outras 28 — a da natureza da munição. O Apps Script lê as colunas por posição, então a coluna extra empurrou todo o resto uma casa. **Cada campo recebeu o valor do campo seguinte.**
