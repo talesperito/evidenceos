@@ -499,7 +499,8 @@ e a importação é pulado pelo importador (id + FAV).
    à mão e o registro em Logs de Auditoria.
 6. No console do `api`, cada um primeiro **sem** `--confirmar`: `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs`,
    `importar-reds-pje.cjs` (os dois últimos recebem o `.json`; conferir o SHA-256).
-7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha.
+7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha. **E (24/11):** backup novo depois dos
+   scripts, restaurado aqui, e `scripts/comparar-bancos-reds-pje.py` contra o backup de antes (12.5).
 8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13). Entregar `pendencias-para-correcao.xlsx`
    para elas trabalharem pela tela, sem prazo; ao corrigir um vestígio, lançam o REDS à mão.
 9. No fim: apagar `c:\tmp\restauracao-lavras\`, o container `evidenceos-restore-lavras` e os PDFs de amostra
@@ -542,6 +543,16 @@ e a importação é pulado pelo importador (id + FAV).
   PCNET" em todas as abas, preenchida por `pcnet-gerar-planilha.py pendencias --notas notas-conferidas.csv`
   (`c:\tmp\pcnet-leitura\2026-11-24\`, colunas aba, fav, id opcional, nota). Hoje: 6 notas em 8 linhas (abas 1, 2, 4
   e 8). **Ao regerar as pendências, passar sempre `--notas`**, senão as notas somem.
+- **Comparação completa antes × depois (24/11, pedido do usuário por segurança):** `scripts/comparar-bancos-reds-pje.py`
+  compara, tabela por tabela e campo a campo, dois bancos restaurados e só aceita o previsto (ver docstring). Ensaio:
+  `lavras_original` (dump intacto) × `lavras_restore` (ensaio) = **0 alarmes**; 5.542 vestígios = 398 sem mudança +
+  4.759 só REDS/PJe + 348 munições + 37 exclusões lógicas; único extra = o cadastro de teste da tela. Prova de que
+  detecta: cópia com 4 alterações feitas à mão → as 4 apontadas. Relatório em `c:\tmp\pcnet-leitura\comparacao-ensaio-2026-11-24\`.
+- **Depois do deploy (decidido 24/11, substitui a ideia de agente na produção, que quebraria as regras de não
+  consultar a produção e não automatizar o PCNET):** backup novo logo após os scripts → restaurar aqui junto do backup
+  de antes → rodar o comparador (100% do banco). Edições das funcionárias entre os dois backups aparecem como "edição
+  pela tela" (auditadas); de preferência, deploy em horário sem uso. Opcional: reler no PCNET ~300 FAVs com o usuário
+  logado e comparar com o REDS/PJe gravados.
 - **Achado fora do escopo, para depois do deploy:** o Relatório Analítico de Custódia tem anos fixos (2022–2025.2) e
   ignora os vestígios de 2026 (1.108 no backup).
 
