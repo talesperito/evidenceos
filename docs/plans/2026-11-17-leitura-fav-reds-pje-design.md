@@ -479,7 +479,7 @@ bruto), `2026-11-24\` (lista de FAVs do backup de 23/11 21:49, planilhas e `pend
 - **Faixa de FAV:** FAVs acima de 2.500.000 não são pedidas ao PCNET (404 vestígios, quase todos Munições).
 - **Posição de REDS e PJe no card:** terceira fila, ao lado da Situação (6.2).
 
-### 12.4 Próximos passos, em ordem (passos 1 e 2 feitos em 24/11, ver 12.5)
+### 12.4 Próximos passos, em ordem (passos 1, 2 e 3 feitos em 24/11, ver 12.5)
 
 **A correção manual das pendências NÃO é pré-requisito do deploy** (esclarecido em 24/11: as funcionárias levariam
 semanas). A importação grava só as linhas `OK`, que não dependem de correção; as pendências ficam como estão (sem REDS) e
@@ -491,7 +491,8 @@ e a importação é pulado pelo importador (id + FAV).
 2. ~~O usuário confere **uma amostra** da planilha principal (10 a 20 linhas contra o PCNET), não a planilha inteira.~~
    **Feito em 24/11** (16 linhas, 12.5). Opcional, ainda em aberto: marcar "Conferido" nas linhas "Conferir" que quiser
    incluir já (32 de requisição, 39 de munições); se marcar, regerar os JSONs.
-3. Decisão do usuário: **push**.
+3. ~~Decisão do usuário: **push**.~~ **Feito em 24/11** com autorização expressa: `origin/main` = `01db885`,
+   conferido com `git ls-remote`. Produção ainda NÃO implantada (o push não implanta nada sozinho).
 4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Se a produção tiver mudado desde 23/11
    21:49, refazer a lista, ler no PCNET só as FAVs que mudaram e regenerar planilhas e arquivos de importação; se não
    mudou, usar os arquivos já gerados.
