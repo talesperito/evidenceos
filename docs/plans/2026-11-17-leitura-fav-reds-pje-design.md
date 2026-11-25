@@ -493,15 +493,30 @@ e a importação é pulado pelo importador (id + FAV).
    incluir já (32 de requisição, 39 de munições); se marcar, regerar os JSONs.
 3. ~~Decisão do usuário: **push**.~~ **Feito em 24/11** com autorização expressa: `origin/main` = `01db885`,
    conferido com `git ls-remote`. Produção ainda NÃO implantada (o push não implanta nada sozinho).
-4. **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Se a produção tiver mudado desde 23/11
+4. **Feito em 25/11:** backup `evidenceos-db-2026-11-25T1232Z.dump.gpg` (VPS, PC e Drive; hashes conferidos).
+   Restaurado como `lavras_hoje` e comparado com o de 23/11 21:49: **produção sem mudança** (5.542 vestígios idênticos;
+   só 1 busca e 1 renovação de sessão na auditoria). Os JSONs de `importacao-2026-11-24\` continuam válidos; nenhuma
+   releitura no PCNET. Texto original do passo: **Backup novo** (obrigatório: há migration), com cópia no PC e no Drive. Se a produção tiver mudado desde 23/11
    21:49, refazer a lista, ler no PCNET só as FAVs que mudaram e regenerar planilhas e arquivos de importação; se não
    mudou, usar os arquivos já gerados.
-5. Deploy do **`api`**, `cd /app && npx prisma@7.7.0 migrate deploy`, deploy do **`web`**; conferir um vestígio editado
-   à mão e o registro em Logs de Auditoria.
+5. **Feito em 25/11 (manhã):** deploy do `api` (commit `bcaa32a`), migration `20261123_0001_add_reds_pje` aplicada em
+   `evidenceos_prod` pelo console do `api`, deploy do `web`; card conferido pelo usuário ("Não informado" antes da
+   importação). Texto original: Deploy do **`api`**, `cd /app && npx prisma@7.7.0 migrate deploy`, deploy do **`web`**;
+   conferir um vestígio editado à mão e o registro em Logs de Auditoria.
+6. **Feito em 25/11:** JSONs enviados por `scp` para `/root/` e `docker cp` para `/tmp/` do container do `api`
+   (`402a17c6b7fb`), SHA-256 conferidos nos três lugares. Rodados pelo Terminal Web (`docker exec`), cada um primeiro sem
+   `--confirmar`, operador = conta ADMIN do usuário. **Produção = ensaio:** duplicatas 30 grupos / **37 excluídos**;
+   munições 351 itens / **348 corrigidos** / 3 pulados (cópias excluídas); importação 4.793 itens / **4.759 gravados** /
+   0 conflitos / 34 pulados / **406 sem REDS** depois.
 6. No console do `api`, cada um primeiro **sem** `--confirmar`: `excluir-duplicatas-fav.cjs`, `corrigir-municoes.cjs`,
    `importar-reds-pje.cjs` (os dois últimos recebem o `.json`; conferir o SHA-256).
-7. Conferência por amostra: 10 vestígios abertos na tela contra a planilha. **E (24/11):** backup novo depois dos
-   scripts, restaurado aqui, e `scripts/comparar-bancos-reds-pje.py` contra o backup de antes (12.5).
+7. **Feito em 25/11:** card da FAV 2394760 conferido na produção (REDS e PJe certos). Backup "depois"
+   `evidenceos-db-2026-11-25T1255Z.dump.gpg` (`.dump` 1.338.027 bytes, 14 `TABLE DATA`, SHA-256 `7619905a…`; `.gpg`
+   1.304.672 bytes, SHA-256 `274e3886…`, igual na VPS e no PC; `.dump` e JSONs apagados da VPS e do container com
+   `shred`/`rm`). Restaurado como `lavras_depois` e comparado com `lavras_hoje` (12:32): **0 alarmes**; 398 sem mudança +
+   4.759 só REDS/PJe + 348 munições + 37 exclusões lógicas; auditoria nova = 4.759 + 348 + 37 + 2 buscas + 2 renovações
+   de sessão; produção final: 5.481 ativos, 5.075 com REDS, 2.354 com PJe. Relatório em
+   `c:\tmp\pcnet-leitura\comparacao-producao-2026-11-25\`.
 8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13). Entregar `pendencias-para-correcao.xlsx`
    para elas trabalharem pela tela, sem prazo; ao corrigir um vestígio, lançam o REDS à mão.
 9. No fim: apagar `c:\tmp\restauracao-lavras\`, o container `evidenceos-restore-lavras` e os PDFs de amostra
