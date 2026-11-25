@@ -118,6 +118,8 @@ export const RangeBarChart: React.FC<{ data: RangeDatum[]; ariaLabel: string }> 
 export interface TrendPoint {
   label: string;
   value: number;
+  /** Período em curso (incompleto): desenhado tracejado e fora da cor de tendência. Só o último ponto pode ser parcial. */
+  parcial?: boolean;
 }
 
 /**
@@ -140,13 +142,18 @@ export const TrendLineChart: React.FC<{ points: TrendPoint[]; ariaLabel: string 
   const coords = points.map((p, i) => {
     const x = padX + i * step;
     const y = padTop + (height - padTop - padBottom) * (1 - (p.value - min) / range);
-    return { x, y, value: p.value, label: p.label };
+    return { x, y, value: p.value, label: p.label, parcial: Boolean(p.parcial) };
   });
 
-  const linePath = coords.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
-  const areaPath = `${linePath} L${coords[coords.length - 1].x.toFixed(1)},${height - padBottom} L${coords[0].x.toFixed(1)},${height - padBottom} Z`;
+  // Linha cheia e área só nos períodos fechados; o parcial (se houver) é ligado por um tracejado.
+  const fechados = coords.filter((c) => !c.parcial);
+  const parcial = coords.find((c) => c.parcial);
+  const linePath = fechados.map((c, i) => `${i === 0 ? 'M' : 'L'}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const areaPath = `${linePath} L${fechados[fechados.length - 1].x.toFixed(1)},${height - padBottom} L${fechados[0].x.toFixed(1)},${height - padBottom} Z`;
+  const ultimoFechado = fechados[fechados.length - 1];
 
-  const rising = coords.length > 1 && coords[coords.length - 1].value > coords[coords.length - 2].value;
+  // A cor compara os dois últimos períodos FECHADOS: o parcial mostraria queda falsa.
+  const rising = fechados.length > 1 && fechados[fechados.length - 1].value > fechados[fechados.length - 2].value;
   const strokeColor = rising ? 'stroke-red-500' : 'stroke-emerald-500';
   const dotColor = rising ? 'fill-red-500' : 'fill-emerald-500';
 
@@ -160,9 +167,19 @@ export const TrendLineChart: React.FC<{ points: TrendPoint[]; ariaLabel: string 
       <line x1={padX} y1={height - padBottom} x2={width - padX} y2={height - padBottom} className="stroke-slate-700 print:stroke-black" strokeWidth={1} />
       <path d={areaPath} className={`${rising ? 'fill-red-500/10' : 'fill-emerald-500/10'} print:fill-transparent`} stroke="none" />
       <path d={linePath} fill="none" strokeWidth={2.5} className={`${strokeColor} print:stroke-black`} />
+      {parcial && ultimoFechado && (
+        <line
+          x1={ultimoFechado.x} y1={ultimoFechado.y} x2={parcial.x} y2={parcial.y}
+          strokeWidth={2} strokeDasharray="5 4" className="stroke-slate-500 print:stroke-black"
+        />
+      )}
       {coords.map((c) => (
         <g key={c.label}>
-          <circle cx={c.x} cy={c.y} r={4} className={`${dotColor} print:fill-black`} />
+          {c.parcial ? (
+            <circle cx={c.x} cy={c.y} r={4} strokeWidth={2} className="fill-slate-900 stroke-slate-400 print:fill-white print:stroke-black" />
+          ) : (
+            <circle cx={c.x} cy={c.y} r={4} className={`${dotColor} print:fill-black`} />
+          )}
           <text x={c.x} y={c.y - 10} textAnchor="middle" className="fill-white text-[11px] font-mono font-bold print:fill-black">
             {c.value.toLocaleString('pt-BR')}
           </text>

@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Vestige, ReportData, CategoryStats, SearchFilters, OpenWithdrawalItem } from '../types';
 import { fetchAllVestiges, getCategories } from '../services/dataService';
 import { listOpenWithdrawalItems } from '../services/withdrawalService';
+import { chaveSemestre, semestreDe } from '../services/reportPeriods';
 
 // A rota devolve ordenado por data agendada: o primeiro a entrar no Map é a retirada mais
 // próxima, que é a que o selo do card deve mostrar.
@@ -234,14 +235,7 @@ export const useVestiges = () => {
           missingReqOver2Years: 0,
           missingReqOver3Years: 0,
           oldestItemDate: null,
-          history: {
-            y2022: 0,
-            y2023: 0,
-            y2024_s1: 0,
-            y2024_s2: 0,
-            y2025_s1: 0,
-            y2025_s2: 0,
-          },
+          history: {},
         };
       }
 
@@ -274,18 +268,9 @@ export const useVestiges = () => {
           stats.oldestItemDate = entryDate;
         }
 
-        const year = entryDate.getFullYear();
-        const isS1 = entryDate.getMonth() < 6;
-
-        if (year === 2022) stats.history.y2022++;
-        else if (year === 2023) stats.history.y2023++;
-        else if (year === 2024) {
-          if (isS1) stats.history.y2024_s1++;
-          else stats.history.y2024_s2++;
-        } else if (year === 2025) {
-          if (isS1) stats.history.y2025_s1++;
-          else stats.history.y2025_s2++;
-        }
+        // Todos os semestres, sem ano fixo: o relatório escolhe quais mostrar (services/reportPeriods.ts).
+        const chave = chaveSemestre(semestreDe(entryDate));
+        stats.history[chave] = (stats.history[chave] || 0) + 1;
       }
     });
 

@@ -79,14 +79,9 @@ export interface CategoryStats {
   missingReqOver2Years: number;
   missingReqOver3Years: number;
   oldestItemDate: Date | null;
-  history: {
-    y2022: number;
-    y2023: number;
-    y2024_s1: number;
-    y2024_s2: number;
-    y2025_s1: number;
-    y2025_s2: number;
-  };
+  // Entradas por semestre, chave "AAAA.S" (ex.: "2026.1"), de todos os anos. Os períodos mostrados são
+  // calculados a partir da data de hoje em services/reportPeriods.ts (sem ano fixo no código).
+  history: Record<string, number>;
 }
 
 export interface ReportData {

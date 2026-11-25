@@ -5,6 +5,9 @@ import { ReportData, CategoryStats } from '../types';
 import { XIcon } from './icons/XIcon';
 import { PrinterIcon } from './icons/PrinterIcon';
 import { BigNumber, HBarChart, RangeBarChart, TrendLineChart, BarDatum } from './charts/ReportCharts';
+import {
+  periodosRelatorio, rotuloSemestre, somarHistoricos, valorAno, valorSemestre,
+} from '../services/reportPeriods';
 
 interface ReportModalProps {
   reportData: ReportData;
@@ -22,6 +25,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
   const handlePrint = () => {
     window.print();
   };
+
+  // Períodos calculados a partir de hoje (services/reportPeriods.ts): nada de ano fixo no código.
+  const periodos = useMemo(() => periodosRelatorio(new Date()), []);
+  const { fechado, anteriorAoFechado, anoReferencia, atual } = periodos;
+  const rotFechado = rotuloSemestre(fechado);
+  const rotAnterior = rotuloSemestre(anteriorAoFechado);
+  const rotAtual = rotuloSemestre(atual);
+  const hojeTexto = new Date().toLocaleDateString('pt-BR');
 
   // Processamento dos dados da tabela Passivo: Filtro, Ordenação e Totais
   const { sortedRows, totals } = useMemo(() => {
@@ -47,17 +58,18 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
   const evolutionRows = useMemo(() => {
     const rows = (Object.entries(reportData.byCategory) as [string, CategoryStats][]).map(([category, stats]) => {
       const h = stats.history;
-      const current = h.y2025_s2;
-      const prev = h.y2025_s1;
-      const avg2024 = (h.y2024_s1 + h.y2024_s2) / 2;
+      // Compara os dois últimos semestres FECHADOS; referência = média semestral do ano fechado anterior.
+      const current = valorSemestre(h, fechado);
+      const prev = valorSemestre(h, anteriorAoFechado);
+      const avgRef = valorAno(h, anoReferencia) / 2;
 
       let criticalityScore = 0;
 
-      if (current === 0 && prev === 0 && avg2024 === 0) {
+      if (current === 0 && prev === 0 && avgRef === 0) {
         criticalityScore = 0;
       } else if (current > prev) {
         criticalityScore = 3; // Vermelho
-      } else if (current > avg2024) {
+      } else if (current > avgRef) {
         criticalityScore = 2; // Laranja
       } else {
         criticalityScore = 1; // Verde
@@ -76,26 +88,20 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
       if (b.criticalityScore !== a.criticalityScore) return b.criticalityScore - a.criticalityScore;
       return b.stats.total - a.stats.total;
     });
-  }, [reportData.byCategory, showCriticalOnly]);
+  }, [reportData.byCategory, showCriticalOnly, fechado, anteriorAoFechado, anoReferencia]);
 
   // KPIs agregados: resposta direta às perguntas "o passivo está crescendo?" e "quanto falta requisição?"
   const { aggregateHistory, globalDeltaPct, criticalCategoryCount } = useMemo(() => {
-    const agg = { y2022: 0, y2023: 0, y2024_s1: 0, y2024_s2: 0, y2025_s1: 0, y2025_s2: 0 };
-    (Object.values(reportData.byCategory) as CategoryStats[]).forEach((stats) => {
-      agg.y2022 += stats.history.y2022;
-      agg.y2023 += stats.history.y2023;
-      agg.y2024_s1 += stats.history.y2024_s1;
-      agg.y2024_s2 += stats.history.y2024_s2;
-      agg.y2025_s1 += stats.history.y2025_s1;
-      agg.y2025_s2 += stats.history.y2025_s2;
-    });
-    const delta = agg.y2025_s1 > 0 ? ((agg.y2025_s2 - agg.y2025_s1) / agg.y2025_s1) * 100 : 0;
-    const criticalCount = (Object.values(reportData.byCategory) as CategoryStats[]).filter((stats) => {
-      const h = stats.history;
-      return h.y2025_s2 > h.y2025_s1;
-    }).length;
+    const todas = Object.values(reportData.byCategory) as CategoryStats[];
+    const agg = somarHistoricos(todas.map((stats) => stats.history));
+    const atualFechado = valorSemestre(agg, fechado);
+    const anterior = valorSemestre(agg, anteriorAoFechado);
+    const delta = anterior > 0 ? ((atualFechado - anterior) / anterior) * 100 : 0;
+    const criticalCount = todas.filter(
+      (stats) => valorSemestre(stats.history, fechado) > valorSemestre(stats.history, anteriorAoFechado),
+    ).length;
     return { aggregateHistory: agg, globalDeltaPct: delta, criticalCategoryCount: criticalCount };
-  }, [reportData.byCategory]);
+  }, [reportData.byCategory, fechado, anteriorAoFechado]);
 
   // Destaques (substitui a antiga grade de cards repetidos por 2 insights acionáveis)
   const highlights = useMemo(() => {
@@ -127,15 +133,25 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
   // Ordenado por volume (quem concentra mais itens agora), não por trajetória: uma categoria
   // gigante em leve queda ainda é mais urgente que uma pequena em alta. Vermelho = concentra
   // boa parte do volume entre as categorias em alerta; laranja = em alerta, mas volume menor.
+  const noFechado = (stats: CategoryStats) => valorSemestre(stats.history, fechado);
   const topMovers = [...evolutionRows]
-    .sort((a, b) => b.stats.history.y2025_s2 - a.stats.history.y2025_s2)
+    .sort((a, b) => noFechado(b.stats) - noFechado(a.stats))
     .slice(0, 10);
-  const topMoversMax = Math.max(...topMovers.map((m) => m.stats.history.y2025_s2), 1);
+  const topMoversMax = Math.max(...topMovers.map((m) => noFechado(m.stats)), 1);
   const topMoversBars: BarDatum[] = topMovers.map(({ category, stats }) => ({
     label: category,
-    value: stats.history.y2025_s2,
-    tone: stats.history.y2025_s2 / topMoversMax >= 0.3 ? 'crit' : 'warn',
+    value: noFechado(stats),
+    tone: noFechado(stats) / topMoversMax >= 0.3 ? 'crit' : 'warn',
   }));
+
+  // Pontos do gráfico de tendência: anos fechados + semestres até o atual (parcial, tracejado).
+  const trendPoints = [
+    ...periodos.anos.map((ano) => ({ label: String(ano), value: valorAno(aggregateHistory, ano) })),
+    ...periodos.semestres.map((sem) => {
+      const parcial = sem.ano === atual.ano && sem.s === atual.s;
+      return { label: rotuloSemestre(sem) + (parcial ? '*' : ''), value: valorSemestre(aggregateHistory, sem), parcial };
+    }),
+  ];
 
   const rangeBarData = sortedRows.map(([category, stats]) => ({
     label: category,
@@ -179,8 +195,8 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
                 helpText={`${((totals.over1 / reportData.totalGlobal) * 100).toFixed(1)}% do total de ${reportData.totalGlobal} vestígios`}
               />
               <BigNumber
-                label="Entradas 25.2 vs. 25.1"
-                value={aggregateHistory.y2025_s2}
+                label={`Entradas ${rotFechado} vs. ${rotAnterior}`}
+                value={valorSemestre(aggregateHistory, fechado)}
                 suffix="itens"
                 deltaPct={globalDeltaPct}
                 lowerIsBetter
@@ -189,7 +205,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
                 label="Categorias em crescimento"
                 value={criticalCategoryCount}
                 suffix="categorias"
-                helpText="Entrada do último semestre maior que o anterior"
+                helpText={`Entrada do semestre ${rotFechado} maior que a do ${rotAnterior} (últimos semestres fechados)`}
               />
             </div>
           </section>
@@ -200,16 +216,13 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
               <span className="bg-cyan-500/10 text-cyan-400 p-1 rounded print:hidden">📉</span> Tendência Geral de Entrada (Total, todas as categorias)
             </h3>
             <TrendLineChart
-              points={[
-                { label: '2022', value: aggregateHistory.y2022 },
-                { label: '2023', value: aggregateHistory.y2023 },
-                { label: '24.1', value: aggregateHistory.y2024_s1 },
-                { label: '24.2', value: aggregateHistory.y2024_s2 },
-                { label: '25.1', value: aggregateHistory.y2025_s1 },
-                { label: '25.2', value: aggregateHistory.y2025_s2 },
-              ]}
-              ariaLabel="Trajetória do total de entradas de vestígios por período, de 2022 até o semestre 25.2"
+              points={trendPoints}
+              ariaLabel={`Trajetória do total de entradas de vestígios por período, de ${periodos.anos[0]} até o semestre ${rotAtual} (parcial)`}
             />
+            <p className="mt-2 text-xs text-slate-500 print:text-black">
+              * {rotAtual}: semestre em curso, contado até {hojeTexto} (tracejado). As comparações usam os semestres fechados
+              ({rotFechado} vs. {rotAnterior}).
+            </p>
           </section>
 
           {/* Section: Top 5 Critical */}
@@ -250,11 +263,14 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
               </div>
             </div>
 
-            {/* Gráfico: categorias em alerta (crescendo ou ainda acima da média 2024), ordenadas por volume */}
+            {/* Gráfico: categorias em alerta (crescendo ou acima da média semestral do ano de referência), por volume */}
             <div className="mb-6">
               <h4 className="text-xs uppercase tracking-wide font-bold text-slate-400 mb-2 print:text-black">
-                Top 10 categorias em alerta, por volume (semestre 25.2)
+                Top 10 categorias em alerta, por volume (semestre {rotFechado})
               </h4>
+              <p className="text-[11px] text-slate-500 mb-2 print:text-black">
+                Crescimento: {rotFechado} maior que {rotAnterior}. Atenção: {rotFechado} acima da média semestral de {anoReferencia}.
+              </p>
               <HBarChart data={topMoversBars} unit="itens" ariaLabel="Top 10 categorias em alerta ordenadas por volume, vermelho para maior concentração" />
             </div>
 
@@ -270,30 +286,50 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
                   <thead>
                     <tr className="bg-slate-900/50 border-b border-slate-700 text-slate-400 text-xs uppercase tracking-wider print:bg-gray-100 print:text-black">
                       <th className="p-3 font-semibold">Categoria</th>
-                      <th className="p-3 font-semibold text-center bg-slate-800/30 border-l border-slate-700 print:text-black">2022</th>
-                      <th className="p-3 font-semibold text-center bg-slate-800/30 border-l border-slate-700 print:text-black">2023</th>
-                      <th className="p-3 font-semibold text-center border-l border-slate-700 text-cyan-200 bg-cyan-900/10 print:text-black">24.1</th>
-                      <th className="p-3 font-semibold text-center text-cyan-200 bg-cyan-900/10 print:text-black">24.2</th>
-                      <th className="p-3 font-semibold text-center border-l border-slate-700 text-green-200 bg-green-900/10 print:text-black">25.1</th>
-                      <th className="p-3 font-semibold text-center text-green-200 bg-green-900/10 print:text-black">25.2</th>
+                      {periodos.anos.map((ano) => (
+                        <th key={ano} className="p-3 font-semibold text-center bg-slate-800/30 border-l border-slate-700 print:text-black">{ano}</th>
+                      ))}
+                      {periodos.semestres.map((sem) => {
+                        const parcial = sem.ano === atual.ano && sem.s === atual.s;
+                        const destaque = sem.ano === fechado.ano && sem.s === fechado.s;
+                        return (
+                          <th
+                            key={`${sem.ano}.${sem.s}`}
+                            className={`p-3 font-semibold text-center border-l border-slate-700 print:text-black ${destaque ? 'text-green-200 bg-green-900/10' : parcial ? 'text-slate-500' : 'text-cyan-200 bg-cyan-900/10'}`}
+                            title={parcial ? `Semestre em curso, até ${hojeTexto}` : undefined}
+                          >
+                            {rotuloSemestre(sem)}{parcial ? '*' : ''}
+                          </th>
+                        );
+                      })}
                       <th className="p-3 font-semibold text-center border-l border-slate-700 w-32 bg-slate-900 print:bg-gray-100 print:text-black">Tendência</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50 bg-slate-800 print:bg-transparent">
                     {evolutionRows.map(({ category, stats }) => {
                       const h = stats.history;
-                      const trendValues = [h.y2024_s1, h.y2024_s2, h.y2025_s1, h.y2025_s2];
+                      // Mini tendência: os 4 últimos semestres fechados; a cor da última barra segue a criticidade.
+                      const trendValues = periodos.tendencia.map((sem) => valorSemestre(h, sem));
                       const maxVal = Math.max(...trendValues, 1);
-                      const avg2024 = (h.y2024_s1 + h.y2024_s2) / 2;
+                      const avgRef = valorAno(h, anoReferencia) / 2;
                       return (
                         <tr key={category} className="hover:bg-slate-700/30 transition-colors text-sm print:text-black">
                           <td className="p-3 font-medium text-slate-200 print:text-black">{category}</td>
-                          <td className="p-3 text-center text-slate-600 border-l border-slate-700/50 print:text-black">{h.y2022}</td>
-                          <td className="p-3 text-center text-slate-600 border-l border-slate-700/50 print:text-black">{h.y2023}</td>
-                          <td className="p-3 text-center text-slate-400 border-l border-slate-700/50 print:text-black">{h.y2024_s1}</td>
-                          <td className="p-3 text-center text-slate-400 print:text-black">{h.y2024_s2}</td>
-                          <td className="p-3 text-center font-bold text-slate-300 border-l border-slate-700/50 print:text-black">{h.y2025_s1}</td>
-                          <td className="p-3 text-center font-bold text-white print:text-black">{h.y2025_s2}</td>
+                          {periodos.anos.map((ano) => (
+                            <td key={ano} className="p-3 text-center text-slate-600 border-l border-slate-700/50 print:text-black">{valorAno(h, ano)}</td>
+                          ))}
+                          {periodos.semestres.map((sem) => {
+                            const parcial = sem.ano === atual.ano && sem.s === atual.s;
+                            const destaque = sem.ano === fechado.ano && sem.s === fechado.s;
+                            return (
+                              <td
+                                key={`${sem.ano}.${sem.s}`}
+                                className={`p-3 text-center border-l border-slate-700/50 print:text-black ${destaque ? 'font-bold text-white' : parcial ? 'text-slate-500 italic' : 'text-slate-400'}`}
+                              >
+                                {valorSemestre(h, sem)}
+                              </td>
+                            );
+                          })}
                           <td className="p-3 border-l border-slate-700 bg-slate-900/30 align-bottom print:bg-transparent">
                             <div className="flex items-end gap-1 h-8 pb-1 justify-center">
                               {trendValues.map((val, idx) => {
@@ -303,7 +339,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
                                 if (isL) {
                                   const prev = trendValues[idx - 1] || 0;
                                   if (val > prev) color = 'bg-red-500';
-                                  else if (val > avg2024) color = 'bg-orange-400';
+                                  else if (val > avgRef) color = 'bg-orange-400';
                                   else color = 'bg-emerald-500';
                                 }
                                 return <div key={idx} className={`w-2 rounded-t transition-all ${color} ${!isL ? 'opacity-40' : ''}`} style={{ height: `${hP}%` }}></div>;
