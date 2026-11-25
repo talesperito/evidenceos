@@ -33,8 +33,13 @@ export interface PeriodosRelatorio {
   atual: Semestre;
   /** Anos fechados mostrados como colunas anuais, do mais antigo para o mais recente. */
   anos: number[];
-  /** Semestres mostrados um a um, do mais antigo até o atual (o último é parcial). */
+  /** Semestres mostrados um a um na tabela, do mais antigo até o atual (o último é parcial). */
   semestres: Semestre[];
+  /**
+   * Pontos do gráfico de tendência: SÓ semestres, do 1º semestre de 3 anos atrás até o atual (parcial).
+   * Ano e semestre na mesma linha criavam um pico falso (o total do ano ao lado de um semestre), visto em 25/11.
+   */
+  semestresGrafico: Semestre[];
   /** Último semestre fechado: é o que se compara. */
   fechado: Semestre;
   /** Semestre fechado anterior ao `fechado`. */
@@ -45,13 +50,20 @@ export interface PeriodosRelatorio {
   tendencia: Semestre[];
 }
 
+/** Semestres de `inicio` até `fim`, inclusive, em ordem. */
+const semestresAte = (inicio: Semestre, fim: Semestre): Semestre[] => {
+  const lista: Semestre[] = [];
+  for (let sem = inicio; ; sem = sem.s === 1 ? { ano: sem.ano, s: 2 } : { ano: sem.ano + 1, s: 1 }) {
+    lista.push(sem);
+    if (sem.ano === fim.ano && sem.s === fim.s) break;
+  }
+  return lista;
+};
+
 export function periodosRelatorio(hoje: Date): PeriodosRelatorio {
   const atual = semestreDe(hoje);
-  const semestres: Semestre[] = [];
-  for (let sem: Semestre = { ano: atual.ano - 1, s: 1 }; ; sem = sem.s === 1 ? { ano: sem.ano, s: 2 } : { ano: sem.ano + 1, s: 1 }) {
-    semestres.push(sem);
-    if (sem.ano === atual.ano && sem.s === atual.s) break;
-  }
+  const semestres = semestresAte({ ano: atual.ano - 1, s: 1 }, atual);
+  const semestresGrafico = semestresAte({ ano: atual.ano - 3, s: 1 }, atual);
   const fechado = semestreAnterior(atual);
   const anteriorAoFechado = semestreAnterior(fechado);
   const tendencia = [semestreAnterior(semestreAnterior(anteriorAoFechado)), semestreAnterior(anteriorAoFechado), anteriorAoFechado, fechado];
@@ -59,6 +71,7 @@ export function periodosRelatorio(hoje: Date): PeriodosRelatorio {
     atual,
     anos: [atual.ano - 3, atual.ano - 2],
     semestres,
+    semestresGrafico,
     fechado,
     anteriorAoFechado,
     anoReferencia: fechado.ano - 1,

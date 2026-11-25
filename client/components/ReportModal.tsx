@@ -144,14 +144,11 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
     tone: noFechado(stats) / topMoversMax >= 0.3 ? 'crit' : 'warn',
   }));
 
-  // Pontos do gráfico de tendência: anos fechados + semestres até o atual (parcial, tracejado).
-  const trendPoints = [
-    ...periodos.anos.map((ano) => ({ label: String(ano), value: valorAno(aggregateHistory, ano) })),
-    ...periodos.semestres.map((sem) => {
-      const parcial = sem.ano === atual.ano && sem.s === atual.s;
-      return { label: rotuloSemestre(sem) + (parcial ? '*' : ''), value: valorSemestre(aggregateHistory, sem), parcial };
-    }),
-  ];
+  // Pontos do gráfico de tendência: só semestres (mesma unidade em todos), até o atual (parcial, tracejado).
+  const trendPoints = periodos.semestresGrafico.map((sem) => {
+    const parcial = sem.ano === atual.ano && sem.s === atual.s;
+    return { label: rotuloSemestre(sem) + (parcial ? '*' : ''), value: valorSemestre(aggregateHistory, sem), parcial };
+  });
 
   const rangeBarData = sortedRows.map(([category, stats]) => ({
     label: category,
@@ -213,11 +210,11 @@ const ReportModal: React.FC<ReportModalProps> = ({ reportData, onClose }) => {
           {/* Section: Tendência Geral (linha agregada — trajetória histórica do total de entradas) */}
           <section className="bg-slate-800/50 p-6 rounded-lg border border-slate-700/80 print:bg-white print:border-none print:p-0 print:mb-6">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2 print:text-black">
-              <span className="bg-cyan-500/10 text-cyan-400 p-1 rounded print:hidden">📉</span> Tendência Geral de Entrada (Total, todas as categorias)
+              <span className="bg-cyan-500/10 text-cyan-400 p-1 rounded print:hidden">📉</span> Tendência Geral de Entrada (Total por semestre, todas as categorias)
             </h3>
             <TrendLineChart
               points={trendPoints}
-              ariaLabel={`Trajetória do total de entradas de vestígios por período, de ${periodos.anos[0]} até o semestre ${rotAtual} (parcial)`}
+              ariaLabel={`Trajetória do total de entradas de vestígios por semestre, de ${rotuloSemestre(periodos.semestresGrafico[0])} até ${rotAtual} (parcial)`}
             />
             <p className="mt-2 text-xs text-slate-500 print:text-black">
               * {rotAtual}: semestre em curso, contado até {hojeTexto} (tracejado). As comparações usam os semestres fechados
