@@ -519,8 +519,11 @@ e a importação é pulado pelo importador (id + FAV).
    `c:\tmp\pcnet-leitura\comparacao-producao-2026-11-25\`.
 8. Avisar as funcionárias: **o cadastro novo passa a exigir o Nº REDS** (P13). Entregar `pendencias-para-correcao.xlsx`
    para elas trabalharem pela tela, sem prazo; ao corrigir um vestígio, lançam o REDS à mão.
-9. No fim: apagar `c:\tmp\restauracao-lavras\`, o container `evidenceos-restore-lavras` e os PDFs de amostra
-   (`c:\tmp\pcnet-favs-amostra\`), com aviso ao usuário (5.4).
+9. **Feito em 25/11, com autorização do usuário:** apagados `c:\tmp\restauracao-lavras\` (4 dumps em claro), o
+   container `evidenceos-restore-lavras` com o volume (cópias `lavras_restore`, `lavras_original`, `lavras_hoje`,
+   `lavras_depois`) e `c:\tmp\pcnet-favs-amostra\` (PDFs). Ficam: os 6 `.gpg` em `C:\Backups\EvidenceOS\` e os dados da
+   leitura em `c:\tmp\pcnet-leitura\` (planilhas, pendências, notas, JSONs, releitura). Para comparar de novo, restaurar
+   de um `.gpg` num container novo.
 10. Campo Belo: acrescentar no plano do ramo `campobelo` o primeiro REDS (P6) e o REDS obrigatório (P13). **Não tocar em
     Lavras nesse trabalho, nem o contrário.**
 
